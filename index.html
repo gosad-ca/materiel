@@ -1,0 +1,3827 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réquisition de Matériel - SAD-PA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* --- STYLES GÉNÉRAUX ET POUR L'ÉCRAN --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            line-height: 1.5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px; 
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #435ebe 0%, #667eea 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-weight: 700;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .form-section {
+            padding: 25px;
+            border: none;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 0;
+            margin: 0 25px 20px 25px;
+            background: transparent;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+        }
+        /* Indication d'erreur pour les champs requis */
+        .form-group input.input-error {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25);
+        }
+        /* Message d'erreur discret pour le formulaire */
+        .form-error {
+            display: none;
+            color: #dc3545;
+            background: #fff5f5;
+            border-left: 3px solid #dc3545;
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin: 0 0 10px 0;
+            font-size: 13px;
+        }
+        
+        .inventory-section {
+            padding: 25px;
+            border: none;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 0;
+            margin: 0 25px 20px 25px;
+            background: transparent;
+        }
+
+        #inventoryContainer {
+            display: block;
+        }
+
+        .category {
+            margin-bottom: 20px;
+        }
+        
+        .category h3 {
+            font-weight: 700;
+            padding: 10px 15px;
+            margin: 0 0 12px 0;
+            color: #435ebe;
+            border-left: 4px solid #667eea;
+            background-color: #f8f9fa;
+            font-size: 15px;
+            border-radius: 4px;
+        }
+        
+        .items-grid {
+            display: grid;
+            gap: 0;
+        }
+        
+        .item {
+            display: grid;
+            grid-template-columns: 25px 45px 1fr 80px 70px;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 8px;
+            background: transparent;
+            border-radius: 0;
+            transition: background-color 0.3s;
+            border: none;
+            border-bottom: 1px dotted #e0e0e0;
+        }
+
+        .item.selected {
+            background: rgba(102, 126, 234, 0.05);
+            border-bottom-color: #b8c1f3;
+        }
+        
+        .item:hover {
+            background: rgba(0, 0, 0, 0.02);
+        }
+        
+        .item.focused {
+            outline: 2px solid #667eea;
+            outline-offset: -1px;
+            background: rgba(102, 126, 234, 0.08);
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+        
+        /* Masquer l'indicateur de focus en impression */
+        @media print {
+            .item.focused {
+                outline: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+                z-index: auto !important;
+            }
+        }
+
+        .item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+        }
+
+        .item-details { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px;
+            min-width: 0; /* Permet au texte de se tronquer si nécessaire */
+        }
+        .item-name { 
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .special-inputs { display: flex; gap: 5px; }
+        .special-input {
+            width: 80px; font-size: 12px; padding: 3px;
+            border: 1px solid #ccc; border-radius: 3px;
+        }
+        .special-input:disabled { background: #f0f0f0; }
+        
+        .item-max {
+            color: #6c757d;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 2px 8px;
+            white-space: nowrap;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .item-price { 
+            color: #28a745; 
+            font-weight: 600; 
+            font-size: 14px;
+            text-align: right;
+            justify-self: end;
+            white-space: nowrap;
+            padding-right: 8px;
+            min-width: 60px;
+        }
+        
+        .qty-controls { 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px;
+        }
+        
+        /* Masquer les boutons sur desktop, garder le champ */
+        .qty-btn {
+            display: none;
+        }
+        
+        /* Boutons cachés mais gardant leur espace pour l'alignement */
+        .qty-btn[style*="visibility: hidden"] {
+            visibility: hidden !important;
+        }
+        /* Style de base des boutons - masqués sur desktop */
+        .qty-btn {
+            width: 28px; 
+            height: 22px; 
+            border: 1px solid #ddd; 
+            background: #fff;
+            border-radius: 4px; 
+            font-size: 10px; 
+            cursor: pointer; 
+            align-items: center; 
+            justify-content: center; 
+            transition: all 0.2s;
+            color: #666; 
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .qty-btn:hover { background: #f0f0f0; border-color: #999; }
+        .qty-btn.decrement { color: #dc3545; }
+        .qty-btn.increment { color: #28a745; }
+        .qty-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f8f8f8; }
+        
+        .item-qty {
+            width: 40px; 
+            padding: 3px 2px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px;
+            text-align: center; 
+            font-size: 13px; 
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .item-qty:disabled { background: #f5f5f5; color: #999; }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px 25px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .btn {
+            padding: 12px 28px; border: none; border-radius: 8px; font-size: 15px;
+            font-weight: 600; cursor: pointer; transition: all 0.3s;
+            text-decoration: none; display: inline-block; text-align: center;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-success { background: #007bff; color: white; }
+        .btn-success:hover { background: #0069d9; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
+        .btn-outlook { background: #0078d4; color: white; }
+        .btn-outlook:hover { background: #106ebe; }
+        .btn-outline { background: transparent; color: #667eea; border: 2px solid #667eea; }
+        .btn-outline:hover { background: #667eea; color: white; }
+        
+        /* Styles pour la modal d'historique */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .modal-header {
+            padding: 20px 25px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 20px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .modal-body {
+            padding: 20px 25px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-footer {
+            padding: 15px 25px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        /* Styles pour l'historique */
+        .history-stats {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .history-item {
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .history-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.1);
+        }
+        .history-item.pinned {
+            border-left: 4px solid #28a745;
+            background: #f8fff9;
+        }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .history-client {
+            font-weight: 600;
+            color: #333;
+        }
+        .history-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .pin-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .pin-button:hover {
+            background: #f0f0f0;
+        }
+        .pin-button.pinned {
+            color: #28a745;
+        }
+        .restore-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .restore-button:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        .history-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+        .history-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .history-status.imprimée {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .history-status.envoyée {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .summary {
+            margin: 0 25px 20px 25px;
+            padding: 20px;
+            background: #f9f9f9;
+            border: none;
+            border-top: 1px solid #e0e0e0;
+            border-radius: 0;
+            display: none;
+        }
+        .summary h4 { 
+            color: #155724; 
+            margin-bottom: 15px; 
+            font-size: 16px; 
+            font-weight: 700;
+            text-align: center;
+        }
+        .summary-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .summary-content > div:not(:last-child):not(.summary-total) {
+            border-right: 1px dotted #ccc;
+            padding-right: 15px;
+        }
+        .summary-item { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 4px; 
+            font-size: 12px;
+            padding: 2px 0;
+        }
+        .summary-total { 
+            font-weight: bold; 
+            font-size: 14px; 
+            color: #155724; 
+            border-top: 2px solid #c3e6c3; 
+            padding-top: 8px; 
+            margin-top: 8px;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        
+        .print-only { display: none; }
+        .print-special-value { display: none; }
+
+        /* Bouton historique près de la recherche */
+        .btn-history-search {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+        }
+        
+        .btn-history-search:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Styles pour la recherche */
+        .search-container {
+            position: relative;
+            margin: 0 auto 20px auto;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            font-family: inherit;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #666;
+            cursor: pointer;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .search-clear:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        /* Surlignage des termes recherchés */
+        mark {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 0;
+            border-radius: 0;
+            font-weight: 600;
+            border: none;
+        }
+
+        /* Style pour les articles hors liste */
+        .custom-desc-input {
+            width: calc(100% - 16px); /* Ajusté pour le padding */
+            padding: 4px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .custom-desc-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+        }
+        
+        .custom-desc-input:disabled {
+            background: #f5f5f5;
+            color: #999;
+        }
+        
+        /* Cacher la saisie de description des articles hors liste à l'impression */
+        @media print {
+            .custom-desc-input { display: none !important; }
+            #customItemsSection .item:not(.selected) { display: none !important; }
+            #customItemsSection.hide-on-print { display: none !important; }
+        }
+
+        /* (panneau d'édition retiré) */
+
+        /* Zone de notification discrète */
+        .notice { margin: 10px 25px; padding: 10px 12px; border-radius: 6px; display: none; font-size: 13px; }
+        .notice.info { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+        .notice.warn { background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12; }
+        .notice.error { background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; }
+
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { 
+                max-width: 100%;
+                border-radius: 0; 
+            }
+            .form-section, .inventory-section, .summary {
+                margin: 10px;
+                padding: 15px;
+            }
+            .form-row { grid-template-columns: 1fr; }
+            .search-container {
+                flex-direction: column;
+                gap: 12px;
+                align-items: stretch;
+            }
+            .search-input-wrapper {
+                width: 100%;
+            }
+            .btn-history-search {
+                font-size: 12px;
+                padding: 8px 14px;
+                align-self: center;
+                min-width: 120px;
+            }
+            .item { 
+                grid-template-columns: 25px 1fr 60px 60px;
+                grid-template-rows: auto auto;
+                gap: 8px;
+                padding: 8px 4px;
+            }
+            .item input[type="checkbox"] {
+                grid-column: 1;
+                grid-row: 1;
+            }
+            .item-details {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            .item-max {
+                grid-column: 3;
+                grid-row: 1;
+                font-size: 10px;
+                padding: 1px 6px;
+            }
+            .item-price { 
+                grid-column: 4;
+                grid-row: 1;
+                text-align: right;
+                font-size: 13px;
+                align-self: start;
+                padding-right: 4px;
+            }
+            .qty-controls { 
+                display: flex !important;
+                grid-column: 1 / -1;
+                grid-row: 2;
+                justify-self: center;
+                margin-top: 5px;
+                gap: 2px;
+                width: auto;
+                align-items: center;
+                flex-wrap: nowrap;
+            }
+            .qty-btn {
+                display: flex !important;
+                width: 22px;
+                height: 20px;
+                font-size: 9px;
+            }
+            .item-qty {
+                width: 32px;
+                font-size: 12px;
+                margin: 0 2px;
+            }
+            .controls { 
+                flex-direction: column; 
+                gap: 8px;
+            }
+            .btn { 
+                width: 100%;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            .summary-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- STYLES SPÉCIFIQUES POUR L'IMPRESSION --- */
+        @media print {
+            @page {
+                size: 8.5in 11in;
+                margin: 0.75in 0.75in 1in 0.75in;
+            }
+
+            body {
+                background: white; color: black; padding: 0;
+                font-size: 9pt;
+                font-family: 'Merriweather', serif;
+                line-height: 1.4;
+            }
+
+            .container, .content-wrapper, #inventoryContainer {
+                width: 100%; max-width: 100%; box-shadow: none; border-radius: 0;
+                display: block;
+            }
+
+            .controls, .qty-controls, .item input[type="checkbox"], .summary, .header p, .item-max, .special-input, .search-container {
+                display: none !important;
+            }
+            
+            /* Masquer les placeholders à l'impression */
+            textarea::placeholder, input::placeholder {
+                color: transparent !important;
+                opacity: 0 !important;
+            }
+            
+            /* Classe pour masquer la section commentaires vide à l'impression */
+            .comments-empty-print {
+                display: none !important;
+            }
+            
+            /* Masquer spécifiquement les containers de cases à cocher "à l'unité" */
+            .unit-toggle-container {
+                display: none !important;
+            }
+            
+            /* Masquer les couleurs Tubifast à l'impression */
+            .tubifast-colors {
+                display: none !important;
+            }
+            
+            .item:not(.selected), .category.hide-on-print {
+                display: none !important;
+            }
+
+            .print-only, .print-special-value, .print-unit-name { display: inline !important; }
+            
+            .header {
+                background: none; color: black; text-align: center;
+                padding: 0 0 10px 0; border-bottom: 2px solid black;
+                margin-bottom: 15px;
+            }
+            .header h1 { 
+                font-size: 18pt; 
+                text-align: center; 
+                margin: 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .form-section {
+                padding: 10px 0;
+                border: none;
+                border-bottom: 1px solid #000;
+                margin: 0 0 10px 0;
+                background: transparent;
+            }
+            .form-row {
+                display: grid; grid-template-columns: 1fr 1fr;
+                gap: 8px 30px; margin: 0; font-size: 10pt;
+            }
+            .form-group {
+                display: flex; flex-direction: row; align-items: baseline; gap: 8px;
+            }
+            .form-group label {
+                font-size: 10pt; font-weight: bold; margin: 0;
+                min-width: 70px;
+            }
+            .form-group input {
+                border: none; border-bottom: 1px solid #666;
+                border-radius: 0; padding: 2px 0; font-size: 10pt;
+                flex-grow: 1;
+                background: transparent;
+                font-weight: 500;
+            }
+            
+            .form-group textarea {
+                border: 1px solid #666;
+                border-radius: 0; padding: 8px 4px; font-size: 9pt;
+                background: transparent;
+                font-family: inherit;
+                resize: none;
+                min-height: 60px;
+            }
+            
+            #comments-section {
+                padding: 15px 0;
+                border: none;
+                border-top: 1px solid #000;
+                margin: 10px 0;
+                background: transparent;
+                page-break-inside: avoid;
+            }
+            
+            .inventory-section { 
+                padding: 15px 0 40px 0; 
+                border: none;
+                margin: 0;
+                background: transparent;
+            } /* Espace pour le footer fixe */
+            
+            /* === AMÉLIORATION : Meilleur contrôle des sauts de page === */
+            .category { 
+                page-break-inside: avoid;
+                page-break-after: auto;
+                /* Éviter les orphelins : garder au moins 3 lignes ensemble */
+                orphans: 3;
+                widows: 3;
+            }
+            
+            /* Éviter de commencer une nouvelle catégorie en bas de page */
+            .category h3 {
+                page-break-after: avoid;
+                /* === FIN AMÉLIORATION === */
+                font-size: 10pt; 
+                background: #f5f5f5; 
+                color: black;
+                margin: 14px 0 8px 0; 
+                border: none;
+                padding: 5px 8px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .item {
+                display: flex;
+                flex-direction: row;
+                align-items: baseline;
+                gap: 6px;
+                border: none;
+                padding: 3px 0;
+                page-break-inside: avoid;
+                font-size: 9pt;
+                line-height: 1.4;
+            }
+            
+            .item:not(:last-child) {
+                border-bottom: 1px dotted #ccc;
+            }
+            
+            .item::before {
+                content: attr(data-print-qty) " x";
+                font-weight: bold;
+                color: black;
+                min-width: 25px;
+                text-align: right;
+                margin-right: 8px;
+                font-size: 8.5pt;
+            }
+            
+            #customItemsSection .item-name .print-special-value {
+                display: inline !important;
+            }
+            
+            .item-details { flex-grow: 1; }
+            .item-price { 
+                min-width: 50px; 
+                text-align: right; 
+                font-size: 8pt; 
+                color: #000;
+                margin-left: auto;
+                padding-left: 8px;
+            }
+            
+            .item-name { 
+                display: inline;
+                font-size: 9pt;
+                font-weight: 500;
+            }
+            .special-inputs { display: inline-flex; gap: 3px; margin-left: 5px; }
+            
+            .print-special-value {
+                font-size: 8pt;
+                font-style: italic;
+                padding: 0 2px;
+                border-bottom: 1px dotted #888;
+            }
+            
+            /* Style spécifique pour les articles hors liste en impression */
+            #customItemsSection .item-name .print-special-value {
+                font-size: 9pt;
+                font-style: normal;
+                font-weight: 500;
+                padding: 0;
+                border-bottom: none;
+            }
+
+            #print-summary {
+                display: none; /* Caché par défaut */
+            }
+            
+            /* Conteneur pour le total qui apparaît seulement à la fin */
+            .print-total-end {
+                margin-top: 25px;
+                padding-top: 8px;
+                border-top: 2px solid black;
+                text-align: right;
+                font-size: 10pt;
+                font-weight: bold;
+                page-break-inside: avoid;
+                display: none;
+            }
+            
+            /* Affiche le total seulement en impression */
+            @media print {
+                .print-total-end {
+                    display: block !important;
+                }
+            }
+            
+            /* === MODE CONDENSÉ : Optimisé pour éviter débordements === */
+            html.print-condensed body {
+                font-size: 8pt; 
+                line-height: 1.2; /* Réduit de 1.3 à 1.2 */
+            }
+            html.print-condensed .item { 
+                padding: 1px 0; /* Réduit de 2px à 1px */
+                font-size: 7.5pt; 
+            }
+            html.print-condensed .item-name {
+                font-size: 7.5pt;
+            }
+            html.print-condensed .category h3 {
+                font-size: 8.5pt; /* Réduit de 9pt à 8.5pt */
+                padding: 3px 6px; /* Réduit de 4px à 3px */
+                margin: 6px 0 3px 0; /* Réduit les marges */
+                background: #f8f8f8;
+            }
+            html.print-condensed .item::before {
+                font-size: 7pt;
+                min-width: 20px;
+            }
+            html.print-condensed .item-price {
+                font-size: 6.5pt; /* Réduit de 7pt à 6.5pt */
+                min-width: 45px;
+            }
+            /* === FIN AMÉLIORATION MODE CONDENSÉ === */
+
+            html.print-multicolumn .inventory-section {
+                column-count: 2;
+                column-gap: 25px;
+                column-rule: 1px solid #ddd;
+                margin-bottom: 50px; /* Espace pour le footer */
+            }
+            html.print-multicolumn .category {
+                break-inside: avoid-column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Réquisition de matériel</h1>
+            <p>SAD-PA - Dernière mise à jour le 20 octobre 2025</p>
+        </div>
+        
+        <div class="form-section">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nomIntervenant">Intervenant:</label>
+                    <input type="text" id="nomIntervenant" name="nomIntervenant">
+                </div>
+                <div class="form-group">
+                    <label for="client">Client:</label>
+                    <input type="text" id="client" name="client">
+                </div>
+            </div>
+             <div class="form-row">
+                <div class="form-group">
+                    <label for="poste">Poste:</label>
+                    <input type="text" id="poste" name="poste">
+                </div>
+                <div class="form-group">
+                    <label for="date">Date:</label>
+                    <input type="date" id="date" name="date">
+                </div>
+            </div>
+            <div id="form-error" class="form-error" aria-live="polite" role="status"></div>
+        </div>
+
+        <div class="inventory-section">
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <input type="text" id="searchInput" placeholder="Rechercher des articles..." class="search-input">
+                    <button id="clearSearch" class="search-clear" title="Effacer la recherche">×</button>
+                </div>
+                <button class="btn btn-history-search" onclick="showHistory()" title="Voir l'historique des requêtes">
+                    📋 Historique
+                </button>
+            </div>
+            <div id="inventoryContainer"></div>
+            <!-- Articles Hors Liste -->
+            <div class="category" id="customItemsSection" style="margin-top: 25px;">
+                <h3>Articles hors liste</h3>
+                <div class="items-grid" id="customItemsList"></div>
+            </div>
+        </div>
+
+        <div class="form-section" id="comments-section" style="border-top: 2px solid #e0e0e0; margin-top: 20px;">
+            <div class="form-group" style="width: 100%;">
+                <label for="commentaires" style="font-weight: 600; margin-bottom: 8px; color: #495057; font-size: 14px;">Commentaires:</label>
+                <textarea id="commentaires" name="commentaires" rows="4" 
+                         placeholder="Commentaires additionnels, instructions spéciales, observations, etc."
+                         style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; 
+                                font-size: 14px; font-family: inherit; resize: vertical; min-height: 100px;
+                                transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;"
+                         onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102, 126, 234, 0.25)'; this.style.backgroundColor='#fafbff';"
+                         onblur="this.style.borderColor='#ced4da'; this.style.boxShadow='none'; this.style.backgroundColor='white';"
+                         title="Navigation clavier désactivée dans ce champ - tapez librement"></textarea>
+            </div>
+        </div>
+
+        <div id="summary" class="summary" style="display: none;">
+            <h4>Résumé de la sélection</h4>
+            <div id="summaryContent" class="summary-content"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-secondary" onclick="clearAll()">Effacer tout</button>
+            <button class="btn btn-success" onclick="prepareAndPrint()">Imprimer</button>
+            <button class="btn btn-primary" onclick="sendRequisitionEmail()">Envoyer par courriel (cellulaire) </button>
+            <button class="btn btn-info" onclick="openOutlookWeb()" title="Ouvrir Outlook Web avec l'adresse pré-remplie">📧 Envoyer à l'agente AA - Outlook Web (Bureau/inf. aux) </button>
+            <button class="btn btn-info" onclick="toggleKeyboardHelp()" title="Afficher l'aide clavier">⌨️ Aide</button>
+        </div>
+
+        <div id="page-notice" class="notice" role="status" aria-live="polite"></div>
+        
+        <div id="keyboard-help" style="display: none; margin: 15px 25px; padding: 15px; background: #f0f8ff; border: 1px solid #0066cc; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #0066cc;">Raccourcis clavier</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; font-size: 13px;">
+                <div><strong>↑↓←→ / WASD</strong> : Naviguer entre les articles</div>
+                <div><strong>Page Up / Page Down</strong> : Sauter 5 articles</div>
+                <div><strong>Ctrl+Home / Ctrl+End</strong> : Aller au début/fin</div>
+                <div><strong>Espace / Enter / Numpad 5</strong> : Sélectionner/désélectionner</div>
+                <div><strong>Q / -</strong> : Quantité -1</div>
+                <div><strong>E / +</strong> : Quantité +1</div>
+                <div><strong>Molette souris</strong> : +/- 1 sur le champ quantité (Shift: +/- 5)</div>
+                <div><strong>Esc</strong> : Retirer le focus</div>
+            </div>
+        </div>
+
+        <!-- Modal Historique -->
+        <div id="history-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Historique des requêtes</h3>
+                    <button class="modal-close" onclick="closeHistory()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="history-stats" class="history-stats"></div>
+                    <div id="history-list" class="history-list"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-info" onclick="exportHistoryExcel()" title="Exporter l'historique complet en Excel">📊 Exporter Excel</button>
+                    <button class="btn btn-secondary" onclick="clearAllHistory()">Effacer tout l'historique</button>
+                    <button class="btn btn-primary" onclick="closeHistory()">Fermer</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="print-summary" class="print-total-end"></div>
+    </div>
+
+    <script>
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+        const allItems = [
+            // ... (Toutes vos données d'articles restent ici, inchangées)
+            {cat: 'gants', title: 'Gants', items: [
+                {id: 'gant1', name: 'Gants Non-stérile Nitrile (petit)', price: '0.99 $', max: 2}, {id: 'gant2', name: 'Gants Non-stérile Nitrile (moyen)', price: '0.99 $', max: 2}, {id: 'gant3', name: 'Gants Non-stérile Nitrile (grand)', price: '0.99 $', max: 2}, {id: 'gant4', name: 'Gants Stérile (petit)', price: '0.78 $', max: 10}, {id: 'gant5', name: 'Gants Stérile (moyen)', price: '0.78 $', max: 10}, {id: 'gant6', name: 'Gants Stérile (grand)', price: '0.78 $', max: 10}, {id: 'gant7', name: 'Gants Stérile (x-grand)', price: '0.78 $', max: 10}
+            ]},
+            {cat: 'sterile', title: 'Fournitures stériles', items: [
+                {id: 'sterile1', name: 'Abaisse-langue', price: '0.02 $', max: 10}, {id: 'sterile2', name: 'Bistouri #15', price: '0.58 $', max: 10}, {id: 'sterile3', name: 'Cabaret à pansement', price: '5.38 $', max: 10}, {id: 'sterile4', name: 'Kit à point (ciseau + pince)', price: '0.76 $', max: 10}, {id: 'sterile5', name: 'Pot orange', price: '0.26 $', max: 10}, {id: 'sterile6', name: 'Tige Dacron (en plastique)', price: '0.17 $', max: 10}, {id: 'sterile7', name: 'Tige montée en bois', price: '0.02 $', max: 10}, {id: 'sterile8', name: 'Mousse antiseptique', price: '2.55 $', max: 1}, {id: 'sterile9', name: 'Embout pour irrigation', price: '1.57 $', max: 20}
+            ]},
+            {cat: 'iv', title: 'Fournitures IV / IM / S/C', items: [
+                {id: 'iv1', name: 'Aiguille', price: '-', max: 5, specialInput: { type: 'gauge' }}, {id: 'iv2', name: 'Cathéter IV', price: '-', max: 5, specialInput: { type: 'gauge' }}, {id: 'iv3', name: 'Seringue Luer-Lock (bout vissé)', price: '-', max: 20, specialInput: { type: 'volume' }}
+            ]},
+            {cat: 'adhesif', title: 'Adhésifs', items: [
+                {id: 'adhesif1', name: 'Diachylon rapprochement ¼', price: '0.63 $', max: 2}, {id: 'adhesif2_rouleau', name: 'Hypafix (rouleau)', price: '0.43 $', max: 3}, {id: 'adhesif2_boite', name: 'Hypafix (boîte)', price: '21.50 $', max: 1}, {id: 'adhesif3', name: 'IV 3000 max', price: '0.92 $', max: 20}, {id: 'adhesif4', name: 'Micropore 1"', price: '0.48 $', max: 1}, {id: 'adhesif5', name: 'Tegaderm (petit)', price: '0.13 $', max: 4}, {id: 'adhesif6', name: 'Tegaderm (moyen)', price: '0.58 $', max: 10}, {id: 'adhesif7', name: 'Tegaderm (grand)', price: '3.49 $', max: 7}, {id: 'adhesif8', name: 'Transpore 1"', price: '0.51 $', max: 1}
+            ]},
+            {cat: 'nettoyage', title: 'Agents de nettoyage', items: [
+                {id: 'nettoyage1', name: 'Alcool (tampon)', price: '0.01 $', max: 30}, {id: 'nettoyage2', name: 'Chlorhexidine (tampon)', price: '0.23 $', max: 5}, {id: 'nettoyage3', name: 'Chlorhexidine (tige)', price: '0.42 $', max: 8}, {id: 'nettoyage4', name: 'Dissolvant (tampon)', price: '0.06 $', max: 5}, {id: 'nettoyage5', name: 'Eau stérile 500 ml', price: '4.57 $', max: 7}, {id: 'nettoyage6', name: 'Irilin gl. chlorh. 0.05%', price: '5.44 $', max: 1}, {id: 'nettoyage7', name: 'NaCl .9% 5 ml (fiole rose)', price: '0.26 $', max: 10}, {id: 'nettoyage8', name: 'NaCl .9% Irriguo 60 ml', price: '0.72 $', max: 10}, {id: 'nettoyage9', name: 'NaCl .9% 500 ml', price: '3.51 $', max: 7}, {id: 'nettoyage10', name: 'Proviodine (bouteille)', price: '1.44 $', max: 1}, {id: 'nettoyage11', name: 'Proviodine (tampon)', price: '0.23 $', max: 10}, {id: 'nettoyage12', name: 'Pâte Triad', price: '8.13 $', max: 1}, {id: 'nettoyage13', name: 'Vaseline (tube)', price: '0.95 $', max: 1}
+            ]},
+            {cat: 'nonstérile', title: 'Fournitures non-stériles', items: [
+                {id: 'nonstérile1', name: 'Contenant aiguille (petit)', price: '1.37 $', max: 1}, {id: 'nonstérile2', name: 'Contenant pour cytotoxique', price: '6.24 $', max: 1}, {id: 'nonstérile3', name: 'Jaquette jaune', price: '0.33 $', max: 10}, {id: 'nonstérile4', name: 'Masque', price: '-', max: 10}, {id: 'nonstérile5', name: 'Sac de plastique', price: '0.05 $', max: 10}, {id: 'nonstérile6', name: 'Pot jaune', price: '0.23 $', max: 10}, {id: 'nonstérile7', name: 'Piqué bleu', price: '0.30 $', max: 10}
+            ]},
+            {cat: 'compressif', title: 'Compressif / Tubibast / Filet', items: [
+                {id: 'compressif1', name: 'Coban 4"', price: '4.83 $', max: 18}, {id: 'compressif2', name: 'Coban 2', price: '12.99 $', max: 18}, {id: 'compressif3', name: 'Coban 2 lite', price: '12.99 $', max: 18}, {id: 'compressif4', name: 'Filet', price: '-', max: 2, specialInput: { type: 'filet' }}, {id: 'compressif5', name: 'Ouatine orthopédique', price: '1.25 $', max: 18}, {id: 'compressif6', name: 'Tubifast', price: '-', max: 4, specialInput: { type: 'tubifast' }}, {id: 'compressif7', name: 'Tubigrip', price: '-', max: 4, specialInput: { type: 'tubigrip' }}
+            ]},
+            {cat: 'barrière', title: 'Barrière cutanée / Gel', items: [
+                {id: 'barrière1', name: 'Critic Aid', price: '2.40 $', max: 1}, {id: 'barrière2', name: 'Skin prep (tampon)', price: '0.15 $', max: 10}, {id: 'barrière3', name: 'Intrasite gel', price: '2.40 $', max: 1}, {id: 'barrière4', name: 'Crème Baza (140g)', price: '4.60 $', max: 1}
+            ]},
+            {cat: 'pansement', title: 'Pansements', items: [
+                {id: 'pansement1', name: 'Actisorb (10,5 x 10,5 cm)', price: '4.44 $', max: 5}, {id: 'pansement2', name: 'Adaptic Touch (7,5 x 5 cm)', price: '1.73 $', max: 5}, {id: 'pansement3', name: 'Bactigras (5 x 5cm)', price: '0.70 $', max: 5}, {id: 'pansement4', name: 'Bactigras (10 x 10 cm)', price: '1.28 $', max: 5}, {id: 'pansement5', name: 'Allevyn (10x10 cm)', price: '1.37 $', max: 8}, {id: 'pansement6', name: 'Biatain silicone (12,5x12,5 cm)', price: '2.24 $', max: 8}, {id: 'pansement7', name: 'Biatain silicone lite (7,5 x 7,5cm)', price: '1.11 $', max: 8}, {id: 'pansement8', name: 'Biatain silicone lite (12,5 x 12,5)', price: '3.12 $', max: 8}, {id: 'pansement9', name: 'Biatain silicone Ag (12,5 x 12,5)', price: '6.98 $', max: 5}, {id: 'pansement10', name: 'Compresse non stérile 4x4', price: '3.17 $', max: 1}, {id: 'pansement11', name: 'Compresse non stérile 4x8', price: '9.41 $', max: 1}, {id: 'pansement12', name: 'Boîte de compresses stériles 2 x 2', price: '1.50 $', priceUnit: '0.03 $', max: 2, specialInput: {type: 'unit_toggle', unitMax: 100}}, {id: 'pansement13', name: 'Boîte de compresses stériles 3 x 3', price: '3.00 $', priceUnit: '0.06 $', max: 2, specialInput: {type: 'unit_toggle', unitMax: 100}}, {id: 'pansement14', name: 'Boîte de compresses stériles 4 x 4', price: '3.50 $', priceUnit: '0.07 $', max: 2, specialInput: {type: 'unit_toggle', unitMax: 100}}, {id: 'pansement15', name: 'Boîte de compresses stériles 4 x 8', price: '9.50 $', priceUnit: '0.19 $', max: 2, specialInput: {type: 'unit_toggle', unitMax: 100}}, {id: 'pansement16', name: 'Compresse à drain 3 x 3', price: '0.57 $', max: 10}, {id: 'pansement17', name: 'Compresse à drain 4 x 4', price: '0.15 $', max: 10}, {id: 'pansement18', name: 'Duoderm x-mince (10x10 cm)', price: '0.98 $', max: 3}, {id: 'pansement19', name: 'Inadine (5 x 5 cm)', price: '1.37 $', max: 7}, {id: 'pansement20', name: 'Inadine (9,5 x 9,5 cm)', price: '2.27 $', max: 7}, {id: 'pansement21', name: 'Iodosorb (10g)', price: '14.27 $', max: 2}, {id: 'pansement22', name: 'Acticoat Flex', price: '5.28 $', max: 2}
+            ]},
+            {cat: 'pansement2', title: 'Pansements (suite)', items: [
+                {id: 'kling1', name: 'Paquet de Kling non-stérile 2"', price: '1.56 $', priceUnit: '0.13 $', max: 1, specialInput: {type: 'unit_toggle', unitMax: 6}}, {id: 'kling2', name: 'Paquet de Kling non-stérile 3"', price: '2.16 $', priceUnit: '0.18 $', max: 1, specialInput: {type: 'unit_toggle', unitMax: 6}}, {id: 'kling3', name: 'Paquet de Kling non-stérile 4"', price: '2.52 $', priceUnit: '0.21 $', max: 1, specialInput: {type: 'unit_toggle', unitMax: 6}}, {id: 'kling4', name: 'Paquet de Kling non-stérile 6"', price: '3.60 $', priceUnit: '0.30 $', max: 1, specialInput: {type: 'unit_toggle', unitMax: 6}}, {id: 'pansement2_5', name: 'Mepilex (20 x 20 cm)', price: '8.34 $', max: 3}, {id: 'pansement2_6', name: 'Mepore - Petit (6x7cm)', price: '0.09 $', max: 7}, {id: 'pansement2_7', name: 'Mepore - Grand (9x10cm)', price: '0.15 $', max: 7}, {id: 'pansement2_8', name: 'Paquet de Pad abdominal (petit)', price: '2.40 $', priceUnit: '0.12 $', max: 1, specialInput: {type: 'unit_toggle', unitMax: 20}}, {id: 'pansement2_9', name: 'Paquet de Pad abdominal (grand)', price: '4.20 $', priceUnit: '0.21 $', max: 1, specialInput: {type: 'unit_toggle', unitMax: 20}}, {id: 'pansement2_10', name: 'Mèche 1/4 po AMD', price: '1.69 $', max: 8}, {id: 'pansement2_11', name: 'Mèche ¼ pouce', price: '3.50 $', max: 1}, {id: 'pansement2_12', name: 'Mèche ½ pouce', price: '1.68 $', max: 1}, {id: 'pansement2_13', name: 'Mèche 1 pouce', price: '1.62 $', max: 1}, {id: 'pansement2_14', name: 'Mèche iodoformée 1/4 po', price: '4.49 $', max: 1}, {id: 'pansement2_15', name: 'Mèche iodoformée 1/2 po', price: '4.79 $', max: 1}, {id: 'pansement2_16', name: 'Tegaderm absorbant (petit)', price: '3.96 $', max: 3}, {id: 'pansement2_17', name: 'Tegaderm absorbant (moyen)', price: '6.29 $', max: 1}, {id: 'pansement2_18', name: 'Mepore Pro 6x7cm', price: '0.11 $', max: 7}, {id: 'pansement2_19', name: 'Telfa (moyen) 7.5x10cm', price: '0.10 $', max: 5}
+            ]},
+            {cat: 'urinaire', title: 'Soins urinaires', items: [
+                {id: 'urinaire1', name: 'Bouchon sonde', price: '0.17 $', max: 2}, {id: 'urinaire2', name: 'Cabaret à cathétérisme', price: '2.22 $', max: 2}, {id: 'urinaire3', name: 'Cathéter urinaire', price: '4.50 $', max: 10, specialInput: { type: 'french' }}, {id: 'urinaire4', name: 'Cath-Secur', price: '3.36 $', max: 2}, {id: 'urinaire5', name: 'Gelée lubrifiante (sachet)', price: '1.50 $', max: 5}, {id: 'urinaire6', name: 'Gelée lubrifiante (tube)', price: '1.50 $', max: 1}, {id: 'urinaire7', name: 'Pince à clamper', price: '-', max: 1}, {id: 'urinaire8', name: 'Sac collecteur de nuit 2L', price: '4.03 $', max: 2}, {id: 'urinaire9', name: 'Sac à cuisse 500 ml', price: '0.09 $', max: 2}, {id: 'urinaire10', name: 'Sac à cuisse 1000 ml', price: '0.67 $', max: 2}, {id: 'urinaire11', name: 'Sonde silastic', price: '4.50 $', max: 2, specialInput: { type: 'french' }}, {id: 'urinaire12', name: 'Sonde 100% silicone', price: '4.50 $', max: 2, specialInput: { type: 'french' }}, {id: 'urinaire13', name: 'Seringue 60cc (bout cathéter)', price: '0.40 $', max: 4}
+            ]}
+        ];
+        
+        // --- Le Javascript ci-dessous est entièrement fonctionnel ---
+
+        function createCategory(category) {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'category';
+            let html = `<h3>${category.title}</h3><div class="items-grid">`;
+            category.items.forEach(item => {
+                let specialInputHTML = '';
+                if (item.specialInput) {
+                    if (item.specialInput.type === 'filet') {
+                        specialInputHTML = `<div class="special-inputs" id="special-${item.id}"><input type="text" placeholder="#" class="special-input" id="filet-num-${item.id}" disabled><input type="text" placeholder="longueur (cm)" class="special-input" id="filet-len-${item.id}" disabled></div>`;
+                    } else if (item.specialInput.type === 'tubigrip') {
+                        specialInputHTML = `<div class="special-inputs" id="special-${item.id}"><input type="text" placeholder="lettre" class="special-input" id="tubi-letter-${item.id}" disabled><input type="text" placeholder="longueur (cm)" class="special-input" id="tubi-len-${item.id}" disabled></div>`;
+                    } else if (item.specialInput.type === 'gauge') {
+                        specialInputHTML = `<div class="special-inputs" id="special-${item.id}"><input type="text" placeholder="G" class="special-input" id="gauge-${item.id}" disabled></div>`;
+                    } else if (item.specialInput.type === 'french') {
+                        specialInputHTML = `<div class="special-inputs" id="special-${item.id}"><input type="text" placeholder="Fr" class="special-input" id="french-${item.id}" disabled></div>`;
+                    } else if (item.specialInput.type === 'volume') {
+                        specialInputHTML = `<div class="special-inputs" id="special-${item.id}"><input type="text" placeholder="ml" class="special-input" id="volume-${item.id}" disabled></div>`;
+                    } else if (item.specialInput.type === 'tubifast') {
+                        specialInputHTML = `<div class="special-inputs tubifast-container" id="special-${item.id}" style="display: flex; flex-direction: column; gap: 8px;">
+                            <div class="tubifast-colors" style="display: flex; gap: 12px;">
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #667eea; cursor: pointer;">
+                                    <input type="checkbox" id="tubifast-jaune-${item.id}" onchange="toggleTubifastColor('${item.id}', 'jaune', this.checked)" disabled style="accent-color: #fbbf24;">
+                                    <span>Jaune</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #667eea; cursor: pointer;">
+                                    <input type="checkbox" id="tubifast-bleu-${item.id}" onchange="toggleTubifastColor('${item.id}', 'bleu', this.checked)" disabled style="accent-color: #3b82f6;">
+                                    <span>Bleu</span>
+                                </label>
+                            </div>
+                            <input type="text" placeholder="longueur (cm)" class="special-input" id="tubifast-len-${item.id}" disabled>
+                        </div>`;
+                    } else if (item.specialInput.type === 'unit_toggle') {
+                        specialInputHTML = `<div class="special-inputs unit-toggle-container" id="special-${item.id}" style="display: flex; align-items: center; gap: 8px;">
+                            <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #667eea; cursor: pointer;">
+                                <input type="checkbox" id="unit-toggle-${item.id}" onchange="toggleUnitMode('${item.id}', this.checked, ${item.max}, ${item.specialInput.unitMax})" disabled style="accent-color: #667eea;">
+                                <span>à l'unité</span>
+                            </label>
+                        </div>`;
+                    }
+                }
+                html += `
+                    <div class="item" data-id="${item.id}">
+                        <input type="checkbox" id="${item.id}" onchange="toggleItem(this)">
+                        <div class="qty-controls">
+                            <button class="qty-btn decrement" onclick="adjustQty('${item.id}', -10)" disabled ${item.max < 10 ? 'style="visibility: hidden;"' : ''}>-10</button>
+                            <button class="qty-btn decrement" onclick="adjustQty('${item.id}', -5)" disabled ${item.max < 5 ? 'style="visibility: hidden;"' : ''}>-5</button>
+                            <button class="qty-btn decrement" onclick="adjustQty('${item.id}', -1)" disabled>-1</button>
+                            <input type="number" class="item-qty" min="0" max="${item.max}" value="1" disabled onchange="updateItemPrice('${item.id}'); updateSummary()">
+                            <button class="qty-btn increment" onclick="adjustQty('${item.id}', 1)" disabled>+1</button>
+                            <button class="qty-btn increment" onclick="adjustQty('${item.id}', 5)" disabled ${item.max < 5 ? 'style="visibility: hidden;"' : ''}>+5</button>
+                            <button class="qty-btn increment" onclick="adjustQty('${item.id}', 10)" disabled ${item.max < 10 ? 'style="visibility: hidden;"' : ''}>+10</button>
+                        </div>
+                        <div class="item-details">
+                            <span class="item-name">${item.name}</span>
+                            ${specialInputHTML}
+                        </div>
+                        <span class="item-max" id="max-label-${item.id}">Max ${item.max}${item.specialInput && item.specialInput.type === 'unit_toggle' ? ' bte' : ''}</span>
+                        <span class="item-price" data-box-price="${item.price}" data-unit-price="${item.priceUnit || ''}" id="price-${item.id}">${item.price}</span>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            categoryDiv.innerHTML = html;
+            return categoryDiv;
+        }
+
+        function generateAllCategories() {
+            const container = document.getElementById('inventoryContainer');
+            allItems.forEach(category => {
+                container.appendChild(createCategory(category));
+            });
+        }
+
+        function toggleItem(checkbox) {
+            const item = checkbox.closest('.item');
+            const qtyButtons = item.querySelectorAll('.qty-btn');
+            const qtyInput = item.querySelector('.item-qty');
+            const specialInputs = item.querySelectorAll('.special-input');
+            const unitToggle = item.querySelector(`#unit-toggle-${checkbox.id}`);
+            const tubifastJaune = item.querySelector(`#tubifast-jaune-${checkbox.id}`);
+            const tubifastBleu = item.querySelector(`#tubifast-bleu-${checkbox.id}`);
+            
+            if (checkbox.checked) {
+                item.classList.add('selected');
+                qtyButtons.forEach(btn => btn.disabled = false);
+                specialInputs.forEach(input => input.disabled = false);
+                if (unitToggle) unitToggle.disabled = false;
+                if (tubifastJaune) tubifastJaune.disabled = false;
+                if (tubifastBleu) tubifastBleu.disabled = false;
+                qtyInput.disabled = false;
+                qtyInput.readOnly = false;
+                qtyInput.value = 1;
+                updateQtyButtons(checkbox.id);
+                updateItemPrice(checkbox.id);
+            } else {
+                item.classList.remove('selected');
+                qtyButtons.forEach(btn => btn.disabled = true);
+                specialInputs.forEach(input => { input.disabled = true; input.value = ''; });
+                if (unitToggle) {
+                    unitToggle.disabled = true;
+                    unitToggle.checked = false;
+                    // Reset to box mode
+                    const itemData = allItems.flatMap(cat => cat.items).find(i => i.id === checkbox.id);
+                    if (itemData && itemData.specialInput && itemData.specialInput.type === 'unit_toggle') {
+                        document.getElementById(`max-label-${checkbox.id}`).innerHTML = `Max ${itemData.max} bte`;
+                        qtyInput.max = itemData.max;
+                    }
+                }
+                if (tubifastJaune) {
+                    tubifastJaune.disabled = true;
+                    tubifastJaune.checked = false;
+                }
+                if (tubifastBleu) {
+                    tubifastBleu.disabled = true;
+                    tubifastBleu.checked = false;
+                }
+                qtyInput.disabled = true;
+                qtyInput.readOnly = true;
+                qtyInput.value = 0;
+                updateItemPrice(checkbox.id);
+            }
+            updateSummary();
+        }
+
+        function adjustQty(itemId, change) {
+            const checkbox = document.getElementById(itemId);
+            if (!checkbox.checked) return;
+            const item = checkbox.closest('.item');
+            const qtyInput = item.querySelector('.item-qty');
+            const maxQty = parseInt(qtyInput.max);
+            const currentQty = parseInt(qtyInput.value);
+            const newQty = Math.max(1, Math.min(maxQty, currentQty + change));
+            qtyInput.value = newQty;
+            updateQtyButtons(itemId);
+            updateItemPrice(itemId);
+            updateSummary();
+        }
+
+        function updateQtyButtons(itemId) {
+            const item = document.querySelector(`.item[data-id="${itemId}"]`);
+            if (!item) return;
+            const qtyInput = item.querySelector('.item-qty');
+            const currentQty = parseInt(qtyInput.value);
+            const maxQty = parseInt(qtyInput.max);
+            const buttons = item.querySelectorAll('.qty-btn');
+            
+            buttons.forEach(button => {
+                const onclick = button.getAttribute('onclick');
+                if (button.style.visibility === 'hidden') {
+                    return; // Skip hidden buttons
+                }
+                
+                if (onclick.includes('-10')) {
+                    button.disabled = currentQty <= 10;
+                } else if (onclick.includes('-5')) {
+                    button.disabled = currentQty <= 5;
+                } else if (onclick.includes('-1')) {
+                    button.disabled = currentQty <= 1;
+                } else if (onclick.includes('+1')) {
+                    button.disabled = currentQty >= maxQty;
+                } else if (onclick.includes('+5')) {
+                    button.disabled = currentQty + 4 >= maxQty;
+                } else if (onclick.includes('+10')) {
+                    button.disabled = currentQty + 9 >= maxQty;
+                }
+            });
+        }
+        
+        function updateItemPrice(itemId) {
+            const item = document.querySelector(`.item[data-id="${itemId}"]`);
+            if (!item) return;
+            
+            const qtyInput = item.querySelector('.item-qty');
+            const priceElement = document.getElementById(`price-${itemId}`);
+            const unitToggle = document.getElementById(`unit-toggle-${itemId}`);
+            const qty = parseInt(qtyInput.value) || 0;
+            
+            if (!priceElement) return;
+            
+            const boxPrice = priceElement.getAttribute('data-box-price');
+            const unitPrice = priceElement.getAttribute('data-unit-price');
+            
+            let basePrice = boxPrice; // Prix de boîte par défaut
+            
+            // Vérifier si on est en mode unité pour les compresses
+            if (unitToggle && unitToggle.checked && unitPrice && unitPrice !== '') {
+                basePrice = unitPrice;
+            }
+            
+            if (basePrice && basePrice !== '-' && qty > 0) {
+                const priceValue = parseFloat(basePrice.replace('$', '').trim().replace(',', '.'));
+                if (!isNaN(priceValue)) {
+                    const totalPrice = priceValue * qty;
+                    priceElement.textContent = totalPrice.toFixed(2).replace('.', ',') + ' $';
+                }
+            } else {
+                // Remettre le prix de base (boîte ou unité selon le toggle)
+                if (unitToggle && unitToggle.checked && unitPrice && unitPrice !== '') {
+                    priceElement.textContent = unitPrice;
+                } else {
+                    priceElement.textContent = boxPrice;
+                }
+            }
+        }
+
+        function updateSummary() {
+            const selectedItems = document.querySelectorAll('input[type="checkbox"]:checked');
+            const summaryDiv = document.getElementById('summary');
+            const summaryContent = document.getElementById('summaryContent');
+            const customItems = (typeof getCustomItems === 'function') ? getCustomItems() : [];
+            if (selectedItems.length === 0 && customItems.length === 0) {
+                summaryDiv.style.display = 'none';
+                return;
+            }
+            let total = 0;
+            const itemsByColumn = [[], []];
+            let currentColumn = 0;
+            
+            selectedItems.forEach((checkbox, index) => {
+                const item = checkbox.closest('.item');
+                const name = item.querySelector('.item-name').innerText;
+                const priceElement = item.querySelector('.item-price');
+                const qty = parseInt(item.querySelector('.item-qty').value) || 0;
+                const unitToggle = item.querySelector('[id^="unit-toggle-"]');
+                
+                if (qty > 0) {
+                    // Récupérer les prix depuis les attributs data
+                    const boxPrice = priceElement.getAttribute('data-box-price');
+                    const unitPrice = priceElement.getAttribute('data-unit-price');
+                    
+                    let basePrice = boxPrice; // Prix de boîte par défaut
+                    let displayPrice = priceElement.textContent;
+                    
+                    // Déterminer le bon prix de base
+                    if (unitToggle && unitToggle.checked && unitPrice && unitPrice !== '') {
+                        basePrice = unitPrice;
+                    }
+                    
+                    // Afficher le prix total calculé dans le résumé
+                    itemsByColumn[currentColumn].push(`<div class="summary-item"><span>${name} (x${qty})</span><span>${displayPrice}</span></div>`);
+                    
+                    // Calculer le total avec le prix de base
+                    if (basePrice && basePrice.includes('$')) {
+                        const priceValue = parseFloat(basePrice.replace('$', '').trim().replace(',', '.'));
+                        if (!isNaN(priceValue)) { 
+                            total += priceValue * qty; 
+                        }
+                    }
+                    currentColumn = (currentColumn + 1) % 2;
+                }
+            });
+            
+            // Ajouter les articles hors liste (sans prix)
+            customItems.forEach(ci => {
+                itemsByColumn[currentColumn].push(`<div class=\"summary-item\"><span>${ci.name} (x${ci.qty})</span><span>-</span></div>`);
+                currentColumn = (currentColumn + 1) % 2;
+            });
+
+            let summaryHTML = '';
+            if (itemsByColumn[0].length > 0) {
+                summaryHTML += `<div>${itemsByColumn[0].join('')}</div>`;
+            }
+            if (itemsByColumn[1].length > 0) {
+                summaryHTML += `<div>${itemsByColumn[1].join('')}</div>`;
+            }
+            summaryHTML += `<div class="summary-total">Total estimé : ${total.toFixed(2).replace('.', ',')} $</div>`;
+            summaryContent.innerHTML = summaryHTML;
+            summaryDiv.style.display = 'block';
+        }
+        
+        function toggleUnitMode(itemId, isUnitMode, boxMax, unitMax) {
+            const item = document.getElementById(itemId).closest('.item');
+            const qtyInput = item.querySelector('.item-qty');
+            const maxLabel = document.getElementById(`max-label-${itemId}`);
+            const qtyButtons = item.querySelectorAll('.qty-btn');
+            
+            if (isUnitMode) {
+                // Mode unité
+                qtyInput.max = unitMax;
+                maxLabel.innerHTML = `Max ${unitMax}`;
+                // Réinitialiser la valeur si elle dépasse le nouveau max
+                if (parseInt(qtyInput.value) > unitMax) {
+                    qtyInput.value = unitMax;
+                }
+                // Afficher/masquer les boutons selon le nouveau max
+                qtyButtons.forEach(button => {
+                    const onclick = button.getAttribute('onclick');
+                    if (onclick.includes('+5')) {
+                        button.style.visibility = unitMax >= 5 ? 'visible' : 'hidden';
+                    } else if (onclick.includes('+10')) {
+                        button.style.visibility = unitMax >= 10 ? 'visible' : 'hidden';
+                    }
+                });
+            } else {
+                // Mode boîte
+                qtyInput.max = boxMax;
+                maxLabel.innerHTML = `Max ${boxMax} bte`;
+                // Réinitialiser la valeur si elle dépasse le nouveau max
+                if (parseInt(qtyInput.value) > boxMax) {
+                    qtyInput.value = boxMax;
+                }
+                // Afficher/masquer les boutons selon le nouveau max
+                qtyButtons.forEach(button => {
+                    const onclick = button.getAttribute('onclick');
+                    if (onclick.includes('+5')) {
+                        button.style.visibility = boxMax >= 5 ? 'visible' : 'hidden';
+                    } else if (onclick.includes('+10')) {
+                        button.style.visibility = boxMax >= 10 ? 'visible' : 'hidden';
+                    }
+                });
+            }
+            
+            // Mettre à jour l'état des boutons et le prix
+            updateQtyButtons(itemId);
+            updateItemPrice(itemId);
+            updateSummary();
+        }
+        
+        function toggleTubifastColor(itemId, color, checked) {
+            // Cette fonction peut être utilisée pour des validations ou actions futures
+            // Pour l'instant, elle permet simplement de cocher/décocher les couleurs
+            // Les deux couleurs peuvent être sélectionnées simultanément
+        }
+        
+        function clearAll() {
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                cb.checked = false;
+                toggleItem(cb);
+            });
+            ['nomIntervenant', 'poste', 'client', 'commentaires'].forEach(id => document.getElementById(id).value = '');
+            
+            // Réinitialiser la recherche
+            clearSearch();
+
+            // Réinitialiser les articles hors liste: conserver 1 ligne vide
+            // Attendre un peu pour que le nettoyage de recherche soit terminé
+            setTimeout(() => {
+                if (typeof resetCustomItems === 'function') {
+                    resetCustomItems();
+                }
+            }, 10);
+
+            updateSummary();
+        }
+        
+        function generateRequisitionText() {
+            const formData = {
+                nomIntervenant: document.getElementById('nomIntervenant').value || 'N/A',
+                poste: document.getElementById('poste').value || 'N/A',
+                client: document.getElementById('client').value || 'N/A',
+                date: document.getElementById('date').value,
+                commentaires: document.getElementById('commentaires').value.trim() || ''
+            };
+            let text = `RÉQUISITION DE MATÉRIEL - SAD-PA\n===================================\nDate: ${formData.date}\nIntervenant: ${formData.nomIntervenant}\nPoste: ${formData.poste}\nClient: ${formData.client}\n\nARTICLES DEMANDÉS :\n-----------------------------------\n\n`;
+            let total = 0;
+            const selectedByCategory = {};
+            
+            // === CORRECTION BUG TEXT: Parcourir les articles sélectionnés ===
+            const selectedEls = document.querySelectorAll('.item.selected');
+            selectedEls.forEach(itemElement => {
+                const checkbox = itemElement.querySelector('input[type="checkbox"]');
+                if (!checkbox) return; // Article hors liste
+                
+                const parentCategory = itemElement.closest('.category');
+                if (parentCategory && !parentCategory.querySelector('.item.selected')) {
+                    return;
+                }
+                
+                const qty = parseInt(itemElement.querySelector('.item-qty').value);
+                if (qty <= 0) return;
+                
+                // Trouver l'article dans allItems
+                const itemId = checkbox.id;
+                let item = null;
+                let categoryTitle = '';
+                
+                for (const category of allItems) {
+                    const found = category.items.find(i => i.id === itemId);
+                    if (found) {
+                        item = found;
+                        categoryTitle = category.title;
+                        break;
+                    }
+                }
+                
+                if (!item || !categoryTitle) return;
+                
+                if (!selectedByCategory[categoryTitle]) { 
+                    selectedByCategory[categoryTitle] = []; 
+                }
+                
+                let itemNameForExport = item.name;
+                if (item.specialInput) {
+                    if (item.specialInput.type === 'filet') { const num = document.getElementById(`filet-num-${item.id}`).value || '[#]'; const len = document.getElementById(`filet-len-${item.id}`).value || '[longueur]'; itemNameForExport = `Filet #${num} (longueur: ${len} cm)`;
+                    } else if (item.specialInput.type === 'tubigrip') { const letter = document.getElementById(`tubi-letter-${item.id}`).value || '[lettre]'; const len = document.getElementById(`tubi-len-${item.id}`).value || '[longueur]'; itemNameForExport = `Tubigrip ${letter} (longueur: ${len} cm)`;
+                    } else if (item.specialInput.type === 'gauge') { const gauge = document.getElementById(`gauge-${item.id}`).value || '[G]'; itemNameForExport = `${item.name} ${gauge}G`;
+                    } else if (item.specialInput.type === 'french') { const fr = document.getElementById(`french-${item.id}`).value || '[Fr]'; itemNameForExport = `${item.name} ${fr}Fr`;
+                    } else if (item.specialInput.type === 'volume') { const vol = document.getElementById(`volume-${item.id}`).value || '[ml]'; itemNameForExport = `${item.name} ${vol}ml`; }
+                }
+                selectedByCategory[categoryTitle].push({ name: itemNameForExport, qty: qty });
+                if (item.price.includes('$')) {
+                    const priceValue = parseFloat(item.price.replace('$', '').trim().replace(',', '.'));
+                    if (!isNaN(priceValue)) { total += priceValue * qty; }
+                }
+            });
+            // === FIN CORRECTION BUG TEXT ===
+            Object.keys(selectedByCategory).forEach(categoryName => {
+                text += `--- ${categoryName.toUpperCase()} ---\n`;
+                selectedByCategory[categoryName].forEach(item => {
+                    text += `- ${item.name} (Quantité : ${item.qty})\n`;
+                });
+                text += '\n';
+            });
+            // Ajouter les articles hors liste
+            const customItems = (typeof getCustomItems === 'function') ? getCustomItems() : [];
+            if (customItems.length > 0) {
+                text += `--- ARTICLES HORS LISTE ---\n`;
+                customItems.forEach(ci => {
+                    text += `- ${ci.name} (Quantité : ${ci.qty})\n`;
+                });
+                text += '\n';
+            }
+            
+            // Ajouter les commentaires s'il y en a
+            if (formData.commentaires) {
+                text += `--- COMMENTAIRES ---\n${formData.commentaires}\n\n`;
+            }
+            
+            text += `===================================\nTotal estimé : ${total.toFixed(2).replace('.', ',')} $\nGénéré le ${new Date().toLocaleString('fr-CA')}`;
+            return text;
+        }
+
+        function generatePDF() {
+            return new Promise((resolve) => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Configuration de base
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const margin = 20;
+                let yPosition = margin;
+                
+                // En-tête
+                doc.setFontSize(18);
+                doc.setFont(undefined, 'bold');
+                doc.text('RÉQUISITION DE MATÉRIEL', pageWidth / 2, yPosition, { align: 'center' });
+                yPosition += 10;
+                
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'normal');
+                doc.text('SAD-PA', pageWidth / 2, yPosition, { align: 'center' });
+                yPosition += 15;
+                
+                // Informations du formulaire
+                const formData = {
+                    nomIntervenant: document.getElementById('nomIntervenant').value || 'N/A',
+                    poste: document.getElementById('poste').value || 'N/A',
+                    client: document.getElementById('client').value || 'N/A',
+                    date: document.getElementById('date').value,
+                    commentaires: document.getElementById('commentaires').value.trim() || ''
+                };
+                
+                doc.line(margin, yPosition, pageWidth - margin, yPosition);
+                yPosition += 10;
+                
+                doc.setFontSize(10);
+                doc.text(`Intervenant: ${formData.nomIntervenant}`, margin, yPosition);
+                doc.text(`Client: ${formData.client}`, pageWidth / 2, yPosition);
+                yPosition += 6;
+                doc.text(`Poste: ${formData.poste}`, margin, yPosition);
+                doc.text(`Date: ${formData.date}`, pageWidth / 2, yPosition);
+                yPosition += 15;
+                
+                doc.line(margin, yPosition, pageWidth - margin, yPosition);
+                yPosition += 10;
+                
+                // Articles sélectionnés
+                const selectedItems = document.querySelectorAll('.item.selected');
+                const itemsByCategory = {};
+                let total = 0;
+                
+                // === CORRECTION BUG PDF: Parcourir les articles sélectionnés ===
+                selectedItems.forEach(itemElement => {
+                    const checkbox = itemElement.querySelector('input[type="checkbox"]');
+                    if (!checkbox) return; // Article hors liste
+                    
+                    // Vérifier que la catégorie parente sera affichée
+                    const parentCategory = itemElement.closest('.category');
+                    if (parentCategory && !parentCategory.querySelector('.item.selected')) {
+                        return;
+                    }
+                    
+                    const qty = parseInt(itemElement.querySelector('.item-qty').value);
+                    if (qty <= 0) return;
+                    
+                    // Trouver les infos de l'article dans allItems
+                    const itemId = checkbox.id;
+                    let item = null;
+                    let categoryTitle = '';
+                    
+                    for (const category of allItems) {
+                        const found = category.items.find(i => i.id === itemId);
+                        if (found) {
+                            item = found;
+                            categoryTitle = category.title;
+                            break;
+                        }
+                    }
+                    
+                    if (!item || !categoryTitle) return;
+                    
+                    if (!itemsByCategory[categoryTitle]) {
+                        itemsByCategory[categoryTitle] = [];
+                    }
+                    
+                    const unitToggle = document.getElementById(`unit-toggle-${item.id}`);
+                    
+                    let itemNameForPDF = item.name;
+                    let basePrice = item.price;
+                    
+                    // Gérer le mode unité/boîte pour les compresses et Kling
+                    if (unitToggle && unitToggle.checked && item.priceUnit) {
+                        if (item.name.includes('Boîte de')) {
+                            itemNameForPDF = item.name.replace('Boîte de ', '') + ' (à l\'unité)';
+                        } else if (item.name.includes('Paquet de')) {
+                            itemNameForPDF = item.name.replace('Paquet de ', '') + ' (à l\'unité)';
+                        }
+                        basePrice = item.priceUnit;
+                    }
+                    
+                    if (item.specialInput) {
+                        const specialInputs = itemElement.querySelectorAll('.special-input');
+                        let specialValues = [];
+                        
+                        // Gérer les couleurs Tubifast
+                        if (item.specialInput.type === 'tubifast') {
+                            const tubifastJaune = document.getElementById(`tubifast-jaune-${item.id}`);
+                            const tubifastBleu = document.getElementById(`tubifast-bleu-${item.id}`);
+                            let colors = [];
+                            if (tubifastJaune && tubifastJaune.checked) colors.push('Jaune');
+                            if (tubifastBleu && tubifastBleu.checked) colors.push('Bleu');
+                            if (colors.length > 0) {
+                                specialValues.push(colors.join(' + '));
+                            }
+                        }
+                        
+                        // Gérer les autres inputs spéciaux
+                        specialInputs.forEach(input => {
+                            if (input.value) {
+                                let value = input.value;
+                                const id = input.id;
+                                if (id.startsWith('gauge-')) value += ' G';
+                                else if (id.startsWith('filet-len-') || id.startsWith('tubi-len-') || id.startsWith('tubifast-len-')) value += ' cm';
+                                else if (id.startsWith('french-')) value += ' Fr';
+                                specialValues.push(value);
+                            }
+                        });
+                        
+                        if (specialValues.length > 0) {
+                            itemNameForPDF += ` (${specialValues.join(', ')})`;
+                        }
+                    }
+                    
+                    // Calculer le prix total
+                    let itemTotal = '-';
+                    if (basePrice.includes('$')) {
+                        const priceValue = parseFloat(basePrice.replace('$', '').trim().replace(',', '.'));
+                        if (!isNaN(priceValue)) {
+                            const calculatedTotal = priceValue * qty;
+                            total += calculatedTotal;
+                            itemTotal = calculatedTotal.toFixed(2).replace('.', ',') + ' $';
+                        }
+                    }
+                    
+                    itemsByCategory[categoryTitle].push({
+                        name: itemNameForPDF,
+                        qty: qty,
+                        price: itemTotal
+                    });
+                });
+                // === FIN CORRECTION BUG PDF ===
+                
+                // Écrire les catégories et articles
+                Object.keys(itemsByCategory).forEach(categoryName => {
+                    doc.setFont(undefined, 'bold');
+                    doc.setFontSize(11);
+                    doc.text(categoryName.toUpperCase(), margin, yPosition);
+                    yPosition += 8;
+                    
+                    doc.setFont(undefined, 'normal');
+                    doc.setFontSize(9);
+                    
+                itemsByCategory[categoryName].forEach(item => {
+                    if (yPosition > 270) { // Nouvelle page si nécessaire
+                        doc.addPage();
+                        yPosition = margin;
+                    }
+                    
+                    const itemText = `${item.qty} x ${item.name}`;
+                    doc.text(itemText, margin + 5, yPosition);
+                    doc.text(item.price, pageWidth - margin - 20, yPosition, { align: 'right' });
+                    yPosition += 5;
+                });
+                yPosition += 5;
+            });
+
+            // Ajouter les articles hors liste (sans prix)
+            const customItemsForPdf = (typeof getCustomItems === 'function') ? getCustomItems() : [];
+            if (customItemsForPdf.length > 0) {
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(11);
+                if (yPosition > 270) { doc.addPage(); yPosition = margin; }
+                doc.text('ARTICLES HORS LISTE', margin, yPosition);
+                yPosition += 8;
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                customItemsForPdf.forEach(ci => {
+                    if (yPosition > 270) { doc.addPage(); yPosition = margin; }
+                    const itemText = `${ci.qty} x ${ci.name}`;
+                    doc.text(itemText, margin + 5, yPosition);
+                    yPosition += 5;
+                });
+                yPosition += 5;
+            }
+
+            // Ajouter les commentaires s'il y en a
+            if (formData.commentaires) {
+                if (yPosition > 240) { doc.addPage(); yPosition = margin; }
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(11);
+                doc.text('COMMENTAIRES', margin, yPosition);
+                yPosition += 8;
+                
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                
+                // Diviser les commentaires en lignes pour éviter le débordement
+                const maxWidth = pageWidth - (2 * margin);
+                const lines = doc.splitTextToSize(formData.commentaires, maxWidth);
+                
+                lines.forEach(line => {
+                    if (yPosition > 270) { doc.addPage(); yPosition = margin; }
+                    doc.text(line, margin, yPosition);
+                    yPosition += 5;
+                });
+                yPosition += 5;
+            }
+                
+                // Total
+                if (yPosition > 250) {
+                    doc.addPage();
+                    yPosition = margin;
+                }
+                
+                doc.line(margin, yPosition, pageWidth - margin, yPosition);
+                yPosition += 10;
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(12);
+                doc.text(`Total estimé : ${total.toFixed(2).replace('.', ',')} $`, pageWidth - margin, yPosition, { align: 'right' });
+                
+                resolve(doc);
+            });
+        }
+
+        // Utilitaires de validation et d'affichage d'erreur
+        function showFormError(message, firstMissingEl) {
+            const errorDiv = document.getElementById('form-error');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+            if (firstMissingEl) {
+                firstMissingEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                try { firstMissingEl.focus({ preventScroll: true }); } catch(_) { firstMissingEl.focus(); }
+            }
+        }
+
+        function hideFormError() {
+            const errorDiv = document.getElementById('form-error');
+            if (errorDiv) errorDiv.style.display = 'none';
+        }
+
+        function validateRequiredFields(actionLabel) {
+            const intervenantEl = document.getElementById('nomIntervenant');
+            const clientEl = document.getElementById('client');
+            const intervenant = (intervenantEl.value || '').trim();
+            const client = (clientEl.value || '').trim();
+
+            intervenantEl.classList.toggle('input-error', !intervenant);
+            clientEl.classList.toggle('input-error', !client);
+
+            if (!intervenant || !client) {
+                const firstMissing = !intervenant ? intervenantEl : clientEl;
+                showFormError(`Veuillez remplir les champs "Intervenant" et "Client" pour ${actionLabel}.`, firstMissing);
+                return false;
+            }
+            hideFormError();
+            return true;
+        }
+
+        // Notifications discrètes
+        function showNotice(type, message) {
+            const el = document.getElementById('page-notice');
+            if (!el) return;
+            el.className = `notice ${type}`;
+            el.textContent = message;
+            el.style.display = 'block';
+            // Auto-hide après 6s pour info uniquement
+            if (type === 'info') {
+                clearTimeout(showNotice._t);
+                showNotice._t = setTimeout(() => { el.style.display = 'none'; }, 6000);
+            }
+        }
+
+        // (panneau d'édition retiré)
+
+        async function sendRequisitionEmail() {
+            if (!validateRequiredFields('envoyer par courriel')) return;
+            const intervenant = document.getElementById('nomIntervenant').value;
+            const client = document.getElementById('client').value;
+            
+            try {
+                // Générer le PDF
+                const doc = await generatePDF();
+                const pdfData = doc.output('datauristring');
+                
+                const poste = document.getElementById('poste').value;
+                const intervenantPart = poste ? `${intervenant} (#${poste})` : intervenant;
+                const subject = `Réquisition de matériel pour ${client} par ${intervenantPart}`;
+                
+                // Corps de l'email avec instructions actualisées pour la pièce jointe
+                const body = `Bonjour,
+
+Veuillez trouver ci-joint la réquisition de matériel pour :
+- Client: ${client}
+- Intervenant: ${intervenantPart}
+- Date: ${document.getElementById('date').value}
+
+Note : Le PDF a été généré automatiquement mais ne peut pas être joint automatiquement, veuillez le joindre au courriel manuellement.
+
+Cordialement,
+${intervenant}`;
+
+                // Télécharger le PDF d'abord
+                const currentDate = new Date().toISOString().slice(0, 10);
+                const filename = `Requisition_${client.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate}.pdf`;
+                doc.save(filename);
+                
+                // Sauvegarder dans l'historique avant envoi
+                saveToHistory('envoyée');
+                
+                // Ouvrir le client email pré-rempli et afficher une notification discrète
+                const email = 'agentesadsherbrooke.csss-iugs@ssss.gouv.qc.ca';
+                const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                setTimeout(() => { window.location.href = mailtoLink; }, 300);
+                showNotice('info', `PDF téléchargé sous « ${filename} ». Joignez-le manuellement à votre courriel.`);
+                
+            } catch (error) {
+                console.error('Erreur lors de la génération du PDF:', error);
+                // Fallback: ouvrir directement le client email avec le texte brut
+                const body = generateRequisitionText();
+                
+                // Sauvegarder dans l'historique même en cas d'erreur PDF
+                saveToHistory('envoyée');
+                
+                const email = 'agentesadsherbrooke.csss-iugs@ssss.gouv.qc.ca';
+                const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                window.location.href = mailtoLink;
+                showNotice('warn', "Impossible de générer le PDF automatiquement. Le courriel s'ouvrira sans pièce jointe.");
+            }
+        }
+        
+        async function openOutlookWeb() {
+            if (!validateRequiredFields('utiliser Outlook Web')) return;
+            
+            const intervenant = document.getElementById('nomIntervenant').value;
+            const client = document.getElementById('client').value;
+            const poste = document.getElementById('poste').value;
+            
+            const intervenantPart = poste ? `${intervenant} (#${poste})` : intervenant;
+            const subject = `Réquisition de matériel pour ${client} par ${intervenantPart}`;
+            
+            try {
+                // Générer le PDF
+                const doc = await generatePDF();
+                const pdfData = doc.output('datauristring');
+                
+                // Télécharger le PDF automatiquement
+                const currentDate = new Date().toISOString().slice(0, 10);
+                const filename = `Requisition_${client.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate}.pdf`;
+                doc.save(filename);
+                
+                // Corps de l'email avec instructions pour Outlook Web
+                const body = `Bonjour,
+
+Veuillez trouver ci-joint la réquisition de matériel pour :
+- Client: ${client}
+- Intervenant: ${intervenantPart}
+- Date: ${document.getElementById('date').value}
+
+Le fichier PDF "${filename}" a été téléchargé automatiquement dans votre dossier de téléchargements. 
+Veuillez le joindre manuellement à ce courriel avant l'envoi.
+
+Cordialement,
+${intervenant}`;
+                
+                const email = 'agentesadsherbrooke.csss-iugs@ssss.gouv.qc.ca';
+                
+                // Tentative expérimentale : copier le nom du fichier dans le presse-papiers pour faciliter la recherche
+                if (navigator.clipboard && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(filename);
+                        console.log('Nom de fichier copié dans le presse-papiers');
+                    } catch (clipboardError) {
+                        console.log('Impossible de copier dans le presse-papiers:', clipboardError);
+                    }
+                }
+                
+                // Créer l'URL Outlook Web
+                const outlookWebUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(email)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                
+                // Sauvegarder dans l'historique avant d'ouvrir
+                saveToHistory('envoyée');
+                
+                // Délai court pour permettre le téléchargement, puis ouvrir Outlook Web
+                setTimeout(() => {
+                    window.open(outlookWebUrl, '_blank');
+                }, 500);
+                
+                // Notification avec instructions détaillées
+                showNotice('info', `PDF généré : "${filename}". Outlook Web s'ouvrira dans un instant. Le nom du fichier a été copié dans le presse-papiers pour faciliter la recherche lors de l'ajout de la pièce jointe.`);
+                
+            } catch (error) {
+                console.error('Erreur lors de la génération du PDF:', error);
+                
+                // Fallback: ouvrir Outlook Web sans PDF
+                const body = `Bonjour,
+
+Réquisition de matériel pour :
+- Client: ${client}
+- Intervenant: ${intervenantPart}
+- Date: ${document.getElementById('date').value}
+
+Note : Une erreur est survenue lors de la génération automatique du PDF. 
+Veuillez utiliser le bouton "Imprimer" pour créer le document manuellement.
+
+Cordialement,
+${intervenant}`;
+                
+                const email = 'agentesadsherbrooke.csss-iugs@ssss.gouv.qc.ca';
+                const outlookWebUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(email)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                
+                // Sauvegarder dans l'historique
+                saveToHistory('envoyée');
+                
+                window.open(outlookWebUrl, '_blank');
+                showNotice('warn', 'Outlook Web ouvert. Erreur PDF - utilisez le bouton "Imprimer" pour créer le document.');
+            }
+        }
+
+        function prepareAndPrint() {
+            // Validation discrète avant impression
+            if (!validateRequiredFields('imprimer')) return;
+
+            const categories = document.querySelectorAll('.category');
+            const selectedItems = document.querySelectorAll('.item.selected');
+            const rootEl = document.documentElement;
+            const inventorySection = document.querySelector('.inventory-section');
+
+            // === CORRECTION BUG: Nettoyer les sélections orphelines ===
+            // S'assurer qu'aucun article coché n'est dans une catégorie qui sera masquée
+            categories.forEach(cat => {
+                const hasSelected = cat.querySelector('.item.selected');
+                if (!hasSelected) {
+                    // Décocher tous les items potentiellement cachés de cette catégorie
+                    cat.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                        const item = cb.closest('.item');
+                        if (!item.classList.contains('selected')) {
+                            console.log('[BUG FIX] Nettoyage: désactivation de checkbox orpheline dans', cat.querySelector('h3')?.textContent);
+                            cb.checked = false;
+                        }
+                    });
+                }
+            });
+            // === FIN CORRECTION ===
+
+            categories.forEach(cat => {
+                cat.classList.toggle('hide-on-print', !cat.querySelector('.item.selected'));
+            });
+            
+            // Gérer aussi la section des articles hors liste
+            const customSection = document.getElementById('customItemsSection');
+            if (customSection) {
+                const hasSelectedCustom = customSection.querySelector('.item.selected');
+                customSection.classList.toggle('hide-on-print', !hasSelectedCustom);
+                
+                // Préparer les articles hors liste pour l'impression
+                customSection.querySelectorAll('.item.selected').forEach(itemEl => {
+                    const qtyInput = itemEl.querySelector('.item-qty');
+                    const qty = parseInt(qtyInput.value) || 0;
+                    itemEl.setAttribute('data-print-qty', qty);
+                    
+                    // Ajouter le texte de description pour l'impression
+                    const descInput = itemEl.querySelector('.custom-desc-input');
+                    const nameSpan = itemEl.querySelector('.item-name');
+                    if (descInput && nameSpan && descInput.value.trim()) {
+                        // Supprimer tout ancien span print-special-value
+                        nameSpan.querySelectorAll('.print-special-value').forEach(span => span.remove());
+                        
+                        const printSpan = document.createElement('span');
+                        printSpan.className = 'print-special-value';
+                        printSpan.textContent = descInput.value.trim();
+                        printSpan.style.display = 'none';
+                        nameSpan.appendChild(printSpan);
+                    }
+                });
+            }
+
+            // Gérer la section commentaires pour l'impression
+            const commentsSection = document.getElementById('comments-section');
+            const commentsTextarea = document.getElementById('commentaires');
+            if (commentsSection && commentsTextarea) {
+                const hasComments = commentsTextarea.value.trim().length > 0;
+                if (hasComments) {
+                    commentsSection.classList.remove('comments-empty-print');
+                } else {
+                    commentsSection.classList.add('comments-empty-print');
+                }
+            }
+
+            rootEl.classList.remove('print-condensed', 'print-multicolumn');
+            
+            // === AMÉLIORATION : Logique adaptative plus intelligente ===
+            // Compter le nombre de catégories avec articles sélectionnés
+            const categoriesWithItems = Array.from(categories).filter(cat => 
+                cat.querySelector('.item.selected') && !cat.classList.contains('hide-on-print')
+            ).length;
+            
+            // Ajuster selon le nombre d'articles ET de catégories
+            if (selectedItems.length > 40 || categoriesWithItems > 6) {
+                // Beaucoup d'articles OU beaucoup de catégories
+                rootEl.classList.add('print-condensed');
+                rootEl.classList.add('print-multicolumn');
+                console.log('[PRINT] Mode: Condensé + Multi-colonnes');
+            } else if (selectedItems.length > 25 || categoriesWithItems > 4) {
+                // Quantité moyenne
+                rootEl.classList.add('print-multicolumn');
+                console.log('[PRINT] Mode: Multi-colonnes');
+            } else if (selectedItems.length > 12 || categoriesWithItems > 3) {
+                // Peu d'articles mais risque de débordement
+                rootEl.classList.add('print-condensed');
+                console.log('[PRINT] Mode: Condensé (prévention débordement)');
+            } else {
+                console.log('[PRINT] Mode: Normal');
+            }
+            // === FIN AMÉLIORATION ===
+
+            let total = 0;
+            let printedItemsCount = 0; // === CORRECTION BUG: Compteur d'articles réellement imprimés ===
+            
+            selectedItems.forEach(itemEl => {
+                // === CORRECTION BUG: Vérifier si la catégorie parente sera affichée ===
+                const parentCategory = itemEl.closest('.category');
+                const isCustomItem = itemEl.closest('#customItemsSection');
+                
+                // Skip si la catégorie est masquée (mais pas pour les articles hors liste)
+                if (parentCategory && parentCategory.classList.contains('hide-on-print') && !isCustomItem) {
+                    console.warn('[BUG FIX] Article ignoré lors du calcul car sa catégorie est masquée:', 
+                                 itemEl.querySelector('.item-name')?.textContent);
+                    return; // Ne pas compter cet article dans le total
+                }
+                // === FIN CORRECTION ===
+                
+                printedItemsCount++; // === CORRECTION BUG: Compter seulement les articles qui seront imprimés ===
+                
+                const qtyInput = itemEl.querySelector('.item-qty');
+                const qty = parseInt(qtyInput.value) || 0;
+                const itemId = itemEl.getAttribute('data-id');
+                
+                itemEl.setAttribute('data-print-qty', qty);
+
+                // Calculer le prix total pour cet article
+                const priceElement = itemEl.querySelector('.item-price');
+                const unitToggle = itemEl.querySelector('[id^="unit-toggle-"]');
+                
+                if (priceElement) {
+                    const boxPrice = priceElement.getAttribute('data-box-price');
+                    const unitPrice = priceElement.getAttribute('data-unit-price');
+                    
+                    let basePrice = boxPrice; // Prix de boîte par défaut
+                    
+                    // Vérifier si on est en mode unité
+                    if (unitToggle && unitToggle.checked && unitPrice && unitPrice !== '') {
+                        basePrice = unitPrice;
+                        const nameSpan = itemEl.querySelector('.item-name');
+                        if (nameSpan) {
+                            // Supprimer tout ancien span
+                            nameSpan.querySelectorAll('.print-special-value, .print-unit-name').forEach(span => span.remove());
+                            
+                            // Stocker le nom original et créer un nom pour l'impression en mode unité
+                            const originalText = nameSpan.textContent;
+                            let unitText;
+                            if (originalText.includes('Boîte de')) {
+                                unitText = originalText.replace('Boîte de ', '') + ' (à l\'unité)';
+                            } else if (originalText.includes('Paquet de')) {
+                                unitText = originalText.replace('Paquet de ', '') + ' (à l\'unité)';
+                            } else {
+                                unitText = originalText + ' (à l\'unité)';
+                            }
+                            
+                            // Masquer le texte original et ajouter le texte pour mode unité
+                            nameSpan.style.display = 'none';
+                            
+                            const unitNameSpan = document.createElement('span');
+                            unitNameSpan.className = 'print-unit-name print-only';
+                            unitNameSpan.textContent = unitText;
+                            unitNameSpan.style.display = 'none';
+                            
+                            nameSpan.parentElement.insertBefore(unitNameSpan, nameSpan);
+                        }
+                    }
+                    
+                    // Calculer le total pour cet article
+                    if (basePrice && basePrice !== '-') {
+                        const priceValue = parseFloat(basePrice.replace('$', '').trim().replace(',', '.'));
+                        if (!isNaN(priceValue)) {
+                            total += priceValue * qty;
+                        }
+                    }
+                }
+                
+                // Gérer les inputs spéciaux standards
+                itemEl.querySelectorAll('.special-input').forEach(input => {
+                    if (input.value) {
+                        let printValue = input.value;
+                        const id = input.id;
+                        if (id.startsWith('gauge-')) printValue += ' G';
+                        else if (id.startsWith('filet-len-') || id.startsWith('tubi-len-')) printValue += ' cm';
+                        else if (id.startsWith('french-')) printValue += ' Fr';
+                        else if (id.startsWith('tubifast-len-')) printValue += ' cm';
+                        else if (id.startsWith('volume-')) printValue += ' ml';
+                        
+                        const printSpan = document.createElement('span');
+                        printSpan.className = 'print-special-value';
+                        printSpan.textContent = printValue;
+                        input.parentElement.insertBefore(printSpan, input.nextSibling);
+                    }
+                });
+                
+                // Gérer les couleurs Tubifast (afficher les couleurs choisies)
+                const tubifastJaune = itemEl.querySelector('[id^="tubifast-jaune-"]');
+                const tubifastBleu = itemEl.querySelector('[id^="tubifast-bleu-"]');
+                if (tubifastJaune || tubifastBleu) {
+                    let colors = [];
+                    if (tubifastJaune && tubifastJaune.checked) colors.push('Jaune');
+                    if (tubifastBleu && tubifastBleu.checked) colors.push('Bleu');
+                    
+                    if (colors.length > 0) {
+                        const printSpan = document.createElement('span');
+                        printSpan.className = 'print-special-value';
+                        printSpan.textContent = colors.join(' + ');
+                        printSpan.style.display = 'none';
+                        
+                        const nameSpan = itemEl.querySelector('.item-name');
+                        if (nameSpan) {
+                            nameSpan.appendChild(printSpan);
+                        }
+                    }
+                }
+            });
+            
+            // Déplace le résumé à la fin du contenu de l'inventaire
+            const summaryEl = document.getElementById('print-summary');
+            if (summaryEl) {
+                const currentDate = new Date().toLocaleDateString('fr-CA');
+                summaryEl.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 8pt; font-weight: normal;">SAD-PA - ${currentDate}</span>
+                        <span>Total estimé : ${total.toFixed(2).replace('.', ',')} $</span>
+                    </div>
+                `;
+                // Place le total après le dernier élément de l'inventaire
+                inventorySection.appendChild(summaryEl);
+            }
+
+            // === CORRECTION BUG: Log de débogage pour vérifier la cohérence ===
+            console.log(`[BUG FIX] Vérification impression:
+                - Articles sélectionnés (total): ${selectedItems.length}
+                - Articles qui seront imprimés: ${printedItemsCount}
+                - Total calculé: ${total.toFixed(2)} $`);
+            
+            if (printedItemsCount !== selectedItems.length) {
+                console.warn(`[BUG FIX] ATTENTION: ${selectedItems.length - printedItemsCount} article(s) sélectionné(s) ne sera/seront pas imprimé(s)!`);
+            }
+            // === FIN CORRECTION ===
+
+            // Sauvegarder dans l'historique avant impression
+            saveToHistory('imprimée');
+
+            window.print();
+        }
+        
+        function cleanupAfterPrint() {
+            document.querySelectorAll('.category.hide-on-print').forEach(cat => {
+                cat.classList.remove('hide-on-print');
+            });
+            document.documentElement.classList.remove('print-condensed', 'print-multicolumn');
+
+            document.querySelectorAll('.item.selected').forEach(itemEl => {
+                itemEl.removeAttribute('data-print-qty');
+            });
+
+            // Nettoyer les valeurs de print-special et remettre les noms originaux
+            document.querySelectorAll('.print-special-value, .print-unit-name').forEach(span => span.remove());
+            
+            // Remettre les noms originaux visibles
+            document.querySelectorAll('.item-name[style*="display: none"]').forEach(nameSpan => {
+                nameSpan.style.display = '';
+            });
+            
+            // Remet le résumé à sa position d'origine
+            const summaryEl = document.getElementById('print-summary');
+            const container = document.querySelector('.container');
+            if (summaryEl && container) {
+                summaryEl.innerHTML = '';
+                container.appendChild(summaryEl);
+            }
+            
+            // Nettoyer la classe des commentaires vides
+            const commentsSection = document.getElementById('comments-section');
+            if (commentsSection) {
+                commentsSection.classList.remove('comments-empty-print');
+            }
+        }
+
+        window.addEventListener('afterprint', cleanupAfterPrint);
+        
+        // Système de navigation au clavier
+        let currentFocusIndex = -1;
+        let allItemElements = [];
+
+        function initKeyboardNavigation() {
+            allItemElements = Array.from(document.querySelectorAll('.item'));
+            
+            // Ajouter un attribut data-index pour faciliter la navigation
+            allItemElements.forEach((item, index) => {
+                item.setAttribute('data-index', index);
+                
+                // Ajouter le support de la molette de souris sur les champs de quantité
+                const qtyInput = item.querySelector('.item-qty');
+                if (qtyInput) {
+                    qtyInput.addEventListener('wheel', handleMouseWheel);
+                }
+            });
+
+            // Écouter les événements clavier sur tout le document
+            document.addEventListener('keydown', handleKeyboardNavigation);
+        }
+
+        function handleMouseWheel(e) {
+            e.preventDefault();
+            
+            const item = e.target.closest('.item');
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            // Articles hors liste (sans checkbox)
+            if (!checkbox) {
+                const qtyInput = item.querySelector('.item-qty');
+                if (!qtyInput) return;
+                const delta = e.deltaY < 0 ? 1 : -1;
+                const multiplier = e.shiftKey ? 5 : 1;
+                const maxQty = parseInt(qtyInput.max) || 20;
+                const currentQty = parseInt(qtyInput.value) || 1;
+                const newQty = Math.max(1, Math.min(maxQty, currentQty + delta * multiplier));
+                qtyInput.value = newQty;
+                item.classList.add('selected');
+                updateSummary();
+                return;
+            }
+            
+            if (!checkbox.checked) {
+                return;
+            }
+            
+            const itemId = checkbox.id;
+            const delta = e.deltaY < 0 ? 1 : -1;
+            
+            // Utiliser Shift pour des changements plus rapides
+            const multiplier = e.shiftKey ? 5 : 1;
+            
+            adjustQty(itemId, delta * multiplier);
+        }
+
+        function toggleKeyboardHelp() {
+            const helpDiv = document.getElementById('keyboard-help');
+            helpDiv.style.display = helpDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Variable pour tracker si on est dans le champ commentaires
+        let isInCommentsField = false;
+
+        function handleKeyboardNavigation(e) {
+            // Ignorer si on est dans un champ de texte, date, ou textarea
+            if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'date')) {
+                return;
+            }
+            if (e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            // Ignorer aussi si on est dans le champ de recherche
+            if (e.target.id === 'searchInput') {
+                return;
+            }
+            
+            // Ignorer complètement si on est dans le champ commentaires
+            if (isInCommentsField) {
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            const code = e.code;
+
+            switch(key) {
+                case 'arrowup':
+                case 'w':
+                    e.preventDefault();
+                    navigateItems(-1);
+                    break;
+                
+                case 'arrowdown':
+                case 's':
+                    e.preventDefault();
+                    navigateItems(1);
+                    break;
+                
+                case 'pageup':
+                    e.preventDefault();
+                    navigateItems(-5);
+                    break;
+                
+                case 'pagedown':
+                    e.preventDefault();
+                    navigateItems(5);
+                    break;
+                
+                case 'home':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        navigateToIndex(0);
+                    }
+                    break;
+                
+                case 'end':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        navigateToIndex(allItemElements.length - 1);
+                    }
+                    break;
+                
+                case 'arrowleft':
+                case 'a':
+                    e.preventDefault();
+                    navigateItems(-1);
+                    break;
+                
+                case 'arrowright':
+                case 'd':
+                    e.preventDefault();
+                    navigateItems(1);
+                    break;
+                
+                case ' ':  // Barre d'espace
+                    e.preventDefault();
+                    toggleCurrentItem();
+                    break;
+                
+                case '5':  // Numpad 5
+                    if (code === 'Numpad5') {
+                        e.preventDefault();
+                        toggleCurrentItem();
+                    }
+                    break;
+                
+                case '+':
+                case '=':  // Pour le + sans shift
+                case 'e':
+                    e.preventDefault();
+                    adjustCurrentItemQty(1);
+                    break;
+                
+                case '-':
+                case '_':  // Pour le - du pavé numérique
+                case 'q':
+                    e.preventDefault();
+                    adjustCurrentItemQty(-1);
+                    break;
+                
+                case 'enter':
+                    e.preventDefault();
+                    toggleCurrentItem();
+                    break;
+                
+                case 'escape':
+                    e.preventDefault();
+                    clearFocus();
+                    break;
+            }
+        }
+
+        function navigateItems(direction) {
+            // S'assurer que les éléments sont initialisés
+            if (allItemElements.length === 0) {
+                allItemElements = Array.from(document.querySelectorAll('.item'));
+            }
+            
+            // Retirer le focus actuel
+            if (currentFocusIndex >= 0 && currentFocusIndex < allItemElements.length) {
+                allItemElements[currentFocusIndex].classList.remove('focused');
+            }
+
+            // Calculer le nouvel index
+            currentFocusIndex += direction;
+
+            // Gérer les limites
+            if (currentFocusIndex < 0) {
+                currentFocusIndex = allItemElements.length - 1;
+            } else if (currentFocusIndex >= allItemElements.length) {
+                currentFocusIndex = 0;
+            }
+
+            // Appliquer le nouveau focus
+            const focusedItem = allItemElements[currentFocusIndex];
+            if (focusedItem) {
+                focusedItem.classList.add('focused');
+                
+                // Scrolling amélioré avec centrage
+                const rect = focusedItem.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const scrollPadding = viewportHeight * 0.3; // 30% de marge en haut et en bas
+                
+                // Vérifier si l'élément est proche des bords
+                if (rect.top < scrollPadding || rect.bottom > viewportHeight - scrollPadding) {
+                    // Centrer l'élément dans la fenêtre
+                    const elementTop = focusedItem.offsetTop;
+                    const elementHeight = focusedItem.offsetHeight;
+                    const targetScrollY = elementTop - (viewportHeight / 2) + (elementHeight / 2);
+                    
+                    window.scrollTo({
+                        top: targetScrollY,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        }
+
+        function toggleCurrentItem() {
+            if (currentFocusIndex < 0 || currentFocusIndex >= allItemElements.length) {
+                return;
+            }
+
+            const item = allItemElements[currentFocusIndex];
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                toggleItem(checkbox);
+            } else {
+                // Rien à basculer pour les articles hors liste
+            }
+        }
+
+        function adjustCurrentItemQty(change) {
+            // S'assurer que les éléments sont initialisés
+            if (allItemElements.length === 0) {
+                allItemElements = Array.from(document.querySelectorAll('.item'));
+            }
+            
+            // Si aucun élément n'est focalisé, focalisé le premier
+            if (currentFocusIndex < 0 && allItemElements.length > 0) {
+                currentFocusIndex = 0;
+                allItemElements[0].classList.add('focused');
+            }
+            
+            if (currentFocusIndex < 0 || currentFocusIndex >= allItemElements.length) {
+                return;
+            }
+
+            const item = allItemElements[currentFocusIndex];
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            // Si pas de checkbox (articles hors liste), ajuster directement
+            if (!checkbox) {
+                const qtyInput = item.querySelector('.item-qty');
+                if (qtyInput) {
+                    const maxQty = parseInt(qtyInput.max) || 20;
+                    const currentQty = parseInt(qtyInput.value) || 1;
+                    const newQty = Math.max(1, Math.min(maxQty, currentQty + change));
+                    qtyInput.value = newQty;
+                    item.classList.add('selected');
+                    updateSummary();
+                }
+                return;
+            }
+
+            // Si l'article n'est pas sélectionné et qu'on augmente la quantité, le sélectionner d'abord
+            if (!checkbox.checked && change > 0) {
+                checkbox.checked = true;
+                toggleItem(checkbox);
+            }
+            
+            if (checkbox.checked) {
+                const itemId = checkbox.id;
+                adjustQty(itemId, change);
+            }
+        }
+
+        function clearFocus() {
+            if (currentFocusIndex >= 0 && currentFocusIndex < allItemElements.length) {
+                allItemElements[currentFocusIndex].classList.remove('focused');
+            }
+            currentFocusIndex = -1;
+        }
+        
+        function navigateToIndex(index) {
+            // S'assurer que les éléments sont initialisés
+            if (allItemElements.length === 0) {
+                allItemElements = Array.from(document.querySelectorAll('.item'));
+            }
+            
+            // Retirer le focus actuel
+            if (currentFocusIndex >= 0 && currentFocusIndex < allItemElements.length) {
+                allItemElements[currentFocusIndex].classList.remove('focused');
+            }
+            
+            // Appliquer le nouvel index
+            currentFocusIndex = Math.max(0, Math.min(index, allItemElements.length - 1));
+            
+            const focusedItem = allItemElements[currentFocusIndex];
+            if (focusedItem) {
+                focusedItem.classList.add('focused');
+                
+                // Centrer l'élément
+                const viewportHeight = window.innerHeight;
+                const elementTop = focusedItem.offsetTop;
+                const elementHeight = focusedItem.offsetHeight;
+                const targetScrollY = elementTop - (viewportHeight / 2) + (elementHeight / 2);
+                
+                window.scrollTo({
+                    top: targetScrollY,
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        // Fonctionnalité de recherche
+        function initSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const clearButton = document.getElementById('clearSearch');
+            
+            searchInput.addEventListener('input', performSearch);
+            clearButton.addEventListener('click', clearSearch);
+            
+            // Raccourci Ctrl+F pour focus sur la recherche
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'f') {
+                    e.preventDefault();
+                    searchInput.focus();
+                }
+            });
+        }
+        
+        function performSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const categories = document.querySelectorAll('.category');
+            
+            if (!searchTerm) {
+                // Si la recherche est vide, utiliser clearSearch pour tout réinitialiser
+                clearSearchDisplay();
+                return;
+            }
+            
+            categories.forEach(category => {
+                // Ignorer la section des articles hors liste pour la recherche
+                if (category.id === 'customItemsSection') {
+                    return;
+                }
+                
+                const items = category.querySelectorAll('.item');
+                let hasVisibleItems = false;
+                
+                items.forEach(item => {
+                    const itemName = item.querySelector('.item-name').textContent.toLowerCase();
+                    const categoryTitle = category.querySelector('h3').textContent.toLowerCase();
+                    
+                    // Recherche dans le nom de l'article et le titre de la catégorie
+                    if (itemName.includes(searchTerm) || categoryTitle.includes(searchTerm)) {
+                        item.style.display = 'grid';
+                        hasVisibleItems = true;
+                        // Surligner le terme recherché
+                        highlightSearchTerm(item, searchTerm);
+                    } else {
+                        item.style.display = 'none';
+                        removeHighlight(item);
+                    }
+                });
+                
+                // Cacher la catégorie si aucun article n'est visible
+                category.style.display = hasVisibleItems ? 'block' : 'none';
+            });
+            
+            // S'assurer que la section des articles hors liste reste toujours visible
+            const customSection = document.getElementById('customItemsSection');
+            if (customSection) {
+                customSection.style.display = 'block';
+            }
+            
+            // Mettre à jour les éléments pour la navigation clavier (exclure les articles hors liste cachés)
+            allItemElements = Array.from(document.querySelectorAll('.item[style*="grid"], .item:not([style])'));
+            currentFocusIndex = -1;
+            clearFocus();
+        }
+        
+        function clearSearchDisplay() {
+            // Enlever tous les surlignages et afficher tous les éléments
+            const categories = document.querySelectorAll('.category');
+            categories.forEach(category => {
+                // Ne pas traiter la section des articles hors liste ici
+                if (category.id === 'customItemsSection') {
+                    // Juste s'assurer qu'elle est visible mais ne pas toucher aux éléments internes
+                    category.style.display = 'block';
+                    return;
+                }
+                
+                category.style.display = 'block';
+                const items = category.querySelectorAll('.item');
+                items.forEach(item => {
+                    item.style.display = 'grid';
+                    removeHighlight(item);
+                });
+            });
+            
+            // Mettre à jour les éléments pour la navigation clavier
+            allItemElements = Array.from(document.querySelectorAll('.item'));
+            currentFocusIndex = -1;
+            clearFocus();
+        }
+        
+        function highlightSearchTerm(item, searchTerm) {
+            const itemName = item.querySelector('.item-name');
+            const originalText = itemName.textContent;
+            
+            // Enlever les anciens surlignages
+            removeHighlight(item);
+            
+            // Créer le nouveau texte avec surlignage
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            const highlightedText = originalText.replace(regex, '<mark>$1</mark>');
+            
+            if (highlightedText !== originalText) {
+                itemName.innerHTML = highlightedText;
+            }
+        }
+        
+        function removeHighlight(item) {
+            const itemName = item.querySelector('.item-name');
+            const text = itemName.textContent; // Ceci enlève automatiquement les balises HTML
+            itemName.textContent = text;
+        }
+        
+        function forceEnsureCustomItemsVisible() {
+            // Fonction défensive pour s'assurer que les articles hors liste sont toujours visibles et fonctionnels
+            const customSection = document.getElementById('customItemsSection');
+            const customList = document.getElementById('customItemsList');
+            
+            if (!customSection || !customList) {
+                console.error('Sections articles hors liste non trouvées');
+                return;
+            }
+            
+            // Forcer la visibilité de la section
+            customSection.style.display = 'block';
+            customSection.style.visibility = 'visible';
+            
+            // Vérifier s'il y a au moins une ligne vide
+            const existingRows = customList.querySelectorAll('.item');
+            const hasEmptyRow = Array.from(existingRows).some(row => {
+                const textInput = row.querySelector('.custom-desc-input');
+                return textInput && textInput.value.trim() === '';
+            });
+            
+            // Si pas de ligne vide, en créer une
+            if (!hasEmptyRow) {
+                const newRow = createCustomItemRow();
+                customList.appendChild(newRow);
+            }
+            
+            // S'assurer que tous les champs de texte visibles fonctionnent
+            customList.querySelectorAll('.custom-desc-input').forEach(input => {
+                input.style.display = 'block';
+                input.style.visibility = 'visible';
+                input.disabled = false;
+            });
+        }
+
+        function clearSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.value = '';
+            clearSearchDisplay();
+            
+            // Après avoir nettoyé la recherche, s'assurer que les articles hors liste sont OK
+            setTimeout(() => {
+                forceEnsureCustomItemsVisible();
+            }, 50);
+        }
+
+        // --- Articles hors liste: gestion des lignes dynamiques ---
+        const MAX_CUSTOM_ITEMS = 10;
+        let customItemCounter = 0;
+        
+        function createCustomItemRow() {
+            customItemCounter++;
+            const index = customItemCounter;
+            const row = document.createElement('div');
+            row.className = 'item';
+            row.dataset.type = 'custom';
+            row.dataset.customIndex = index;
+
+            row.innerHTML = `
+                <input type=\"checkbox\" id=\"custom-check-${index}\" onchange=\"toggleCustomItem(this, ${index})\" style=\"width: 20px; height: 20px; accent-color: #667eea;\">
+                <div class=\"qty-controls\">
+                    <button class=\"qty-btn decrement\" onclick=\"adjustCustomQty(${index}, -10)\" disabled>-10</button>
+                    <button class=\"qty-btn decrement\" onclick=\"adjustCustomQty(${index}, -5)\" disabled>-5</button>
+                    <button class=\"qty-btn decrement\" onclick=\"adjustCustomQty(${index}, -1)\" disabled>-1</button>
+                    <input type=\"number\" class=\"item-qty\" id=\"custom-qty-${index}\" min=\"1\" max=\"20\" value=\"1\" disabled>
+                    <button class=\"qty-btn increment\" onclick=\"adjustCustomQty(${index}, 1)\" disabled>+1</button>
+                    <button class=\"qty-btn increment\" onclick=\"adjustCustomQty(${index}, 5)\" disabled>+5</button>
+                    <button class=\"qty-btn increment\" onclick=\"adjustCustomQty(${index}, 10)\" disabled>+10</button>
+                </div>
+                <div class=\"item-details\">
+                    <span class=\"item-name\" id=\"custom-name-${index}\">
+                        <input type=\"text\" class=\"custom-desc-input\" id=\"custom-desc-${index}\" 
+                               placeholder=\"Description de l'article\" 
+                               style=\"width: 100%; padding: 4px 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;\"
+                               oninput=\"onCustomDescInput(${index})\">
+                    </span>
+                </div>
+                <span class=\"item-price\">-</span>`;
+
+            return row;
+        }
+
+        function initCustomItems() {
+            const list = document.getElementById('customItemsList');
+            if (!list) {
+                console.error('customItemsList element not found');
+                return;
+            }
+            
+            // Nettoyer le contenu existant
+            list.innerHTML = '';
+            customItemCounter = 0;
+            
+            // Créer une nouvelle ligne vide
+            const newRow = createCustomItemRow();
+            list.appendChild(newRow);
+            
+            // S'assurer que la section parent est visible
+            const customSection = document.getElementById('customItemsSection');
+            if (customSection) {
+                customSection.style.display = 'block';
+            }
+            
+            console.log('Articles hors liste initialisés avec succès');
+        }
+        
+        function toggleCustomItem(checkbox, index) {
+            const item = checkbox.closest('.item');
+            const qtyButtons = item.querySelectorAll('.qty-btn');
+            const qtyInput = item.querySelector('.item-qty');
+            const descInput = item.querySelector('.custom-desc-input');
+            
+            if (checkbox.checked) {
+                item.classList.add('selected');
+                qtyButtons.forEach(btn => btn.disabled = false);
+                qtyInput.disabled = false;
+                qtyInput.readOnly = false;
+                qtyInput.value = 1;
+                updateCustomQtyButtons(index);
+            } else {
+                item.classList.remove('selected');
+                qtyButtons.forEach(btn => btn.disabled = true);
+                qtyInput.disabled = true;
+                qtyInput.readOnly = true;
+                qtyInput.value = 0;
+            }
+            updateSummary();
+        }
+        
+        function updateCustomQtyButtons(index) {
+            const item = document.querySelector(`.item[data-custom-index=\"${index}\"]`);
+            if (!item) return;
+            const qtyInput = item.querySelector('.item-qty');
+            const currentQty = parseInt(qtyInput.value);
+            const maxQty = 20;
+            const buttons = item.querySelectorAll('.qty-btn');
+            
+            buttons.forEach(button => {
+                const onclick = button.getAttribute('onclick');
+                if (button.style.visibility === 'hidden') return;
+                
+                if (onclick.includes('-10')) {
+                    button.disabled = currentQty <= 10;
+                } else if (onclick.includes('-5')) {
+                    button.disabled = currentQty <= 5;
+                } else if (onclick.includes('-1')) {
+                    button.disabled = currentQty <= 1;
+                } else if (onclick.includes('1)')) {
+                    button.disabled = currentQty >= maxQty;
+                } else if (onclick.includes('5)')) {
+                    button.disabled = currentQty + 4 >= maxQty;
+                } else if (onclick.includes('10)')) {
+                    button.disabled = currentQty + 9 >= maxQty;
+                }
+            });
+        }
+
+        function onCustomDescInput(index) {
+            const descEl = document.getElementById(`custom-desc-${index}`);
+            const checkbox = document.getElementById(`custom-check-${index}`);
+            const row = descEl.closest('.item');
+            const value = (descEl.value || '').trim();
+            const list = document.getElementById('customItemsList');
+
+            if (value) {
+                // Activer automatiquement la checkbox si du texte est entré
+                if (!checkbox.checked) {
+                    checkbox.checked = true;
+                    toggleCustomItem(checkbox, index);
+                }
+                
+                // Ajouter une nouvelle ligne si c'est la dernière et qu'on n'a pas atteint le max
+                const rows = Array.from(list.querySelectorAll('.item'));
+                const isLast = rows[rows.length - 1] === row;
+                if (isLast && rows.length < MAX_CUSTOM_ITEMS) {
+                    list.appendChild(createCustomItemRow());
+                }
+            } else {
+                // Désactiver la checkbox si le texte est effacé
+                if (checkbox.checked) {
+                    checkbox.checked = false;
+                    toggleCustomItem(checkbox, index);
+                }
+                pruneTrailingEmptyCustomRows();
+            }
+        }
+
+        function pruneTrailingEmptyCustomRows() {
+            const list = document.getElementById('customItemsList');
+            if (!list) return;
+            const rows = Array.from(list.querySelectorAll('.item'));
+            let emptyCount = 0;
+            for (let i = rows.length - 1; i >= 0; i--) {
+                const desc = rows[i].querySelector('.custom-desc-input');
+                const val = (desc.value || '').trim();
+                if (!val) {
+                    emptyCount++;
+                    if (emptyCount > 1) rows[i].remove();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        function getCustomItems() {
+            const list = document.getElementById('customItemsList');
+            if (!list) return [];
+            const rows = Array.from(list.querySelectorAll('.item'));
+            return rows.map((row) => {
+                const checkbox = row.querySelector('input[type=\"checkbox\"]');
+                const desc = row.querySelector('.custom-desc-input');
+                const qty = row.querySelector('.item-qty');
+                const name = (desc.value || '').trim();
+                const q = parseInt(qty.value) || 0;
+                return (checkbox && checkbox.checked && name) ? { name, qty: Math.max(1, Math.min(20, q)) } : null;
+            }).filter(Boolean);
+        }
+
+        function adjustCustomQty(index, delta) {
+            const checkbox = document.getElementById(`custom-check-${index}`);
+            if (!checkbox || !checkbox.checked) return;
+            
+            const qtyEl = document.getElementById(`custom-qty-${index}`);
+            const descEl = document.getElementById(`custom-desc-${index}`);
+            if (!qtyEl || !descEl) return;
+            if (!(descEl.value || '').trim()) return;
+            
+            const max = 20;
+            const val = parseInt(qtyEl.value) || 1;
+            const next = Math.max(1, Math.min(max, val + delta));
+            qtyEl.value = next;
+            updateCustomQtyButtons(index);
+            updateSummary();
+        }
+
+        function resetCustomItems() { 
+            customItemCounter = 0;
+            initCustomItems(); 
+        }
+        
+        // ================================
+        // SYSTÈME DE PERSISTANCE LOCALE
+        // ================================
+        const STORAGE_KEYS = {
+            HISTORY: 'requisition_history'
+        };
+
+        const MAX_HISTORY_NORMAL = 400;
+        const MAX_HISTORY_TOTAL = 500;
+
+
+        // Fonction pour récupérer les articles sélectionnés (non-custom)
+        function getSelectedItems() {
+            const selectedElements = document.querySelectorAll('.item.selected:not(#customItemsSection .item)');
+            const items = [];
+            
+            selectedElements.forEach(itemEl => {
+                const qtyInput = itemEl.querySelector('.item-qty');
+                const priceEl = itemEl.querySelector('.item-price');
+                const nameEl = itemEl.querySelector('.item-name');
+                
+                if (qtyInput && priceEl && nameEl) {
+                    const qty = parseInt(qtyInput.value) || 1;
+                    const priceText = priceEl.textContent.trim();
+                    const price = priceText === '-' ? 0 : parseFloat(priceText.replace('$', '').replace(',', '.')) || 0;
+                    const name = nameEl.textContent.trim();
+                    
+                    if (name) {
+                        items.push({ name, qty, price });
+                    }
+                }
+            });
+            
+            return items;
+        }
+
+        // Fonction pour récupérer les détails complets des articles sélectionnés pour l'historique
+        function getSelectedItemsForHistory() {
+            const selectedElements = document.querySelectorAll('.item.selected:not(#customItemsSection .item)');
+            const items = [];
+            
+            selectedElements.forEach(itemEl => {
+                const checkbox = itemEl.querySelector('input[type="checkbox"]');
+                if (!checkbox) return;
+                
+                const itemId = checkbox.id;
+                const qtyInput = itemEl.querySelector('.item-qty');
+                const priceEl = itemEl.querySelector('.item-price');
+                const nameEl = itemEl.querySelector('.item-name');
+                
+                if (qtyInput && priceEl && nameEl) {
+                    const qty = parseInt(qtyInput.value) || 1;
+                    const priceText = priceEl.textContent.trim();
+                    const price = priceText === '-' ? 0 : parseFloat(priceText.replace('$', '').replace(',', '.')) || 0;
+                    const name = nameEl.textContent.trim();
+                    
+                    // Capturer les inputs spéciaux
+                    const specialInputs = {};
+                    const specialInputElements = itemEl.querySelectorAll('.special-input');
+                    specialInputElements.forEach(input => {
+                        if (input.value) {
+                            specialInputs[input.id] = input.value;
+                        }
+                    });
+                    
+                    // Capturer le mode unité si applicable
+                    const unitToggle = itemEl.querySelector(`#unit-toggle-${itemId}`);
+                    const isUnitMode = unitToggle ? unitToggle.checked : false;
+                    
+                    // Capturer les checkboxes Tubifast
+                    const tubifastJaune = itemEl.querySelector(`#tubifast-jaune-${itemId}`);
+                    const tubifastBleu = itemEl.querySelector(`#tubifast-bleu-${itemId}`);
+                    const tubifastColors = [];
+                    if (tubifastJaune && tubifastJaune.checked) tubifastColors.push('jaune');
+                    if (tubifastBleu && tubifastBleu.checked) tubifastColors.push('bleu');
+                    
+                    if (name) {
+                        items.push({ 
+                            id: itemId,
+                            name, 
+                            qty, 
+                            price,
+                            specialInputs,
+                            isUnitMode,
+                            tubifastColors,
+                            type: 'standard'
+                        });
+                    }
+                }
+            });
+            
+            return items;
+        }
+
+        // Fonction pour récupérer les articles hors liste avec détails complets
+        function getCustomItemsForHistory() {
+            const list = document.getElementById('customItemsList');
+            if (!list) return [];
+            
+            const rows = Array.from(list.querySelectorAll('.item'));
+            return rows.map((row, index) => {
+                const checkbox = row.querySelector('input[type="checkbox"]');
+                const desc = row.querySelector('.custom-desc-input');
+                const qty = row.querySelector('.item-qty');
+                const name = (desc.value || '').trim();
+                const q = parseInt(qty.value) || 0;
+                
+                if (checkbox && checkbox.checked && name) {
+                    return { 
+                        name, 
+                        qty: Math.max(1, Math.min(20, q)),
+                        price: 0, // Articles hors liste n'ont pas de prix
+                        type: 'custom',
+                        index: index
+                    };
+                }
+                return null;
+            }).filter(Boolean);
+        }
+
+        // Sauvegarde d'une requête dans l'historique
+        function saveToHistory(status) {
+            console.log('=== DEBUT saveToHistory ===', status);
+            
+            try {
+                // Récupérer les données du formulaire directement
+                const client = document.getElementById('client').value.trim() || 'Client non spécifié';
+                const intervenant = document.getElementById('nomIntervenant').value.trim() || 'Intervenant non spécifié';
+                
+                console.log('Données formulaire:', { client, intervenant });
+                
+                // Récupérer les articles avec gestion d'erreurs
+                let selectedItems = [];
+                let customItemsForDisplay = [];
+                let customItemsForHistory = [];
+                
+                try {
+                    selectedItems = getSelectedItemsForHistory();
+                    console.log('Articles standards récupérés:', selectedItems.length);
+                } catch (e) {
+                    console.warn('Erreur lors de la récupération des articles standards:', e);
+                    // Fallback vers la fonction simple mais convertir le format
+                    const simpleItems = getSelectedItems();
+                    selectedItems = simpleItems.map(item => ({
+                        id: '', // Pas d'ID disponible dans la version simple
+                        name: item.name,
+                        qty: item.qty,
+                        price: item.price,
+                        specialInputs: {},
+                        isUnitMode: false,
+                        tubifastColors: [],
+                        type: 'standard'
+                    }));
+                }
+                
+                try {
+                    customItemsForDisplay = getCustomItems(); // Pour le calcul du total et résumé
+                    customItemsForHistory = getCustomItemsForHistory();
+                    console.log('Articles hors liste récupérés:', customItemsForHistory.length);
+                } catch (e) {
+                    console.warn('Erreur lors de la récupération des articles hors liste:', e);
+                    customItemsForDisplay = [];
+                    customItemsForHistory = [];
+                }
+                
+                const allSelected = [...selectedItems, ...customItemsForDisplay];
+                
+                console.log('Articles récupérés pour sauvegarde:', { 
+                    client, 
+                    intervenant, 
+                    selectedCount: selectedItems.length, 
+                    customDisplayCount: customItemsForDisplay.length,
+                    customHistoryCount: customItemsForHistory.length,
+                    totalItems: allSelected.length,
+                    status 
+                });
+                
+                if (allSelected.length === 0) {
+                    console.log('Aucun article sélectionné, pas de sauvegarde');
+                    return; // Pas d'articles sélectionnés
+                }
+                
+                console.log('Sauvegarde en cours...', {
+                    totalArticles: allSelected.length,
+                    standardItems: selectedItems.length,
+                    customItems: customItemsForHistory.length
+                });
+                
+                const totalCost = allSelected.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                const topItems = allSelected
+                    .sort((a, b) => (b.price * b.qty) - (a.price * a.qty))
+                    .slice(0, 3)
+                    .map(item => item.name)
+                    .join(', ');
+                
+                const historyEntry = {
+                    id: Date.now(),
+                    date: document.getElementById('date').value || new Date().toLocaleDateString('fr-CA'),
+                    client: client,
+                    intervenant: intervenant,
+                    status: status, // 'imprimée' ou 'envoyée'
+                    itemsCount: allSelected.length,
+                    totalCost: totalCost,
+                    summary: topItems,
+                    pinned: false,
+                    timestamp: new Date().toISOString(),
+                    // Nouveaux champs pour la restauration
+                    standardItems: selectedItems,
+                    customItems: customItemsForHistory,
+                    formData: {
+                        client: client,
+                        intervenant: intervenant,
+                        poste: document.getElementById('poste').value.trim() || '',
+                        date: document.getElementById('date').value,
+                        commentaires: document.getElementById('commentaires').value.trim() || ''
+                    }
+                };
+                
+                let history = getHistory();
+                history.unshift(historyEntry); // Ajouter en première position
+                
+                // Gérer la rotation (garder les épinglées, limiter les normales)
+                const pinned = history.filter(item => item.pinned);
+                const normal = history.filter(item => !item.pinned);
+                
+                // Limiter les requêtes normales
+                if (normal.length > MAX_HISTORY_NORMAL) {
+                    normal.splice(MAX_HISTORY_NORMAL);
+                }
+                
+                // Recombiner et limiter le total
+                const finalHistory = [...pinned, ...normal];
+                if (finalHistory.length > MAX_HISTORY_TOTAL) {
+                    // Supprimer les plus anciennes non-épinglées
+                    const toRemove = finalHistory.length - MAX_HISTORY_TOTAL;
+                    for (let i = finalHistory.length - 1; i >= 0 && toRemove > 0; i--) {
+                        if (!finalHistory[i].pinned) {
+                            finalHistory.splice(i, 1);
+                        }
+                    }
+                }
+                
+                localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(finalHistory));
+                
+                console.log(`✅ Requête sauvegardée dans l'historique: ${client} (${status})`);
+                console.log('=== FIN saveToHistory SUCCÈS ===');
+                
+            } catch (e) {
+                console.error('❌ Erreur lors de la sauvegarde de l\'historique:', e);
+                console.log('=== FIN saveToHistory ERREUR ===');
+            }
+        }
+
+        // Récupération de l'historique
+        function getHistory() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEYS.HISTORY);
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.warn('Erreur lors du chargement de l\'historique:', e);
+                return [];
+            }
+        }
+
+        // Basculer le statut épinglé d'une requête
+        function togglePinned(id) {
+            try {
+                const history = getHistory();
+                const entry = history.find(item => item.id === id);
+                if (entry) {
+                    entry.pinned = !entry.pinned;
+                    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+                    renderHistory(); // Rafraîchir l'affichage
+                }
+            } catch (e) {
+                console.warn('Erreur lors du basculement de l\'épingle:', e);
+            }
+        }
+
+        // ================================
+        // INTERFACE D'HISTORIQUE
+        // ================================
+        
+        // Afficher la modal d'historique
+        function showHistory() {
+            const modal = document.getElementById('history-modal');
+            modal.style.display = 'flex';
+            renderHistory();
+            
+            // Fermer avec Escape
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    closeHistory();
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        }
+
+        // Fermer la modal d'historique
+        function closeHistory() {
+            const modal = document.getElementById('history-modal');
+            modal.style.display = 'none';
+        }
+
+        // Rendre l'historique dans la modal
+        function renderHistory() {
+            const history = getHistory();
+            const statsEl = document.getElementById('history-stats');
+            const listEl = document.getElementById('history-list');
+            
+            // Statistiques
+            const pinned = history.filter(item => item.pinned);
+            const normal = history.filter(item => !item.pinned);
+            
+            statsEl.innerHTML = `
+                <div><strong>${pinned.length}</strong> requêtes importantes</div>
+                <div><strong>${normal.length}</strong> requêtes récentes</div>
+                <div><strong>${history.length}</strong> total</div>
+            `;
+            
+            // Liste des requêtes (épinglées d'abord)
+            if (history.length === 0) {
+                listEl.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">Aucune requête dans l\'historique</p>';
+                return;
+            }
+            
+            const sortedHistory = [...pinned, ...normal];
+            
+            listEl.innerHTML = sortedHistory.map(entry => `
+                <div class="history-item ${entry.pinned ? 'pinned' : ''}">
+                    <div class="history-header">
+                        <div class="history-client">${entry.client || 'Client non spécifié'}</div>
+                        <div class="history-actions">
+                            <span class="history-status ${entry.status}">${entry.status}</span>
+                            <button class="restore-button" 
+                                    onclick="restoreFromHistory(${entry.id})" 
+                                    title="Restaurer cette requête">
+                                🔄 Restaurer
+                            </button>
+                            <button class="pin-button ${entry.pinned ? 'pinned' : ''}" 
+                                    onclick="togglePinned(${entry.id})" 
+                                    title="${entry.pinned ? 'Retirer l\'épingle' : 'Épingler cette requête'}">
+                                ${entry.pinned ? '📌' : '📍'}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="history-info">
+                        <div><strong>Date:</strong> ${entry.date}</div>
+                        <div><strong>Intervenant:</strong> ${entry.intervenant || 'N/A'}</div>
+                        <div><strong>Articles:</strong> ${entry.itemsCount}</div>
+                        <div><strong>Total:</strong> ${entry.totalCost.toFixed(2)}$</div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 12px; color: #888;">
+                        <strong>Articles:</strong> ${entry.summary || 'Aucun détail'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Hash du mot de passe (obfusqué)
+        const ADMIN_HASH = 'ca45ed1c0f46c74a71cad13f9cfeeec5848e211eb3475816f042b9e95724750a';
+
+        // Fonction de vérification du mot de passe
+        async function verifyAdminPassword(input) {
+            if (!input) return false;
+            
+            const encoder = new TextEncoder();
+            const data = encoder.encode(input);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            return hashHex === ADMIN_HASH;
+        }
+
+        // Effacer tout l'historique (protégé par mot de passe)
+        async function clearAllHistory() {
+            // Demander le mot de passe administrateur
+            const password = prompt('Mot de passe administrateur requis pour effacer l\'historique:');
+            if (!password) {
+                return; // Utilisateur a annulé
+            }
+            
+            // Vérifier le mot de passe
+            const isValid = await verifyAdminPassword(password);
+            if (!isValid) {
+                showNotice('error', 'Mot de passe incorrect. Accès refusé.');
+                return;
+            }
+            
+            // Si le mot de passe est correct, demander confirmation
+            if (confirm('Êtes-vous sûr de vouloir effacer tout l\'historique ? Cette action est irréversible.')) {
+                localStorage.removeItem(STORAGE_KEYS.HISTORY);
+                renderHistory();
+                showNotice('info', 'Historique effacé avec succès.');
+            }
+        }
+
+        // Exporter l'historique en Excel (protégé par mot de passe)
+        async function exportHistoryExcel() {
+            // Demander le mot de passe administrateur
+            const password = prompt('Mot de passe administrateur requis pour exporter l\'historique:');
+            if (!password) {
+                return; // Utilisateur a annulé
+            }
+            
+            // Vérifier le mot de passe
+            const isValid = await verifyAdminPassword(password);
+            if (!isValid) {
+                showNotice('error', 'Mot de passe incorrect. Accès refusé.');
+                return;
+            }
+            
+            // Récupérer l'historique
+            const history = getHistory();
+            if (history.length === 0) {
+                showNotice('info', 'Aucune requête dans l\'historique à exporter.');
+                return;
+            }
+            
+            // Créer un nouveau classeur Excel
+            const workbook = XLSX.utils.book_new();
+            
+            // === FEUILLE 1: RÉSUMÉ EXÉCUTIF ===
+            const summaryData = [
+                ['RAPPORT D\'HISTORIQUE DES RÉQUISITIONS'],
+                ['SAD - Services Administratifs'],
+                [''],
+                ['Date du rapport:', new Date().toLocaleDateString('fr-CA')],
+                ['Heure du rapport:', new Date().toLocaleTimeString('fr-CA')],
+                [''],
+                ['STATISTIQUES GÉNÉRALES'],
+                ['Nombre total de requêtes:', history.length],
+                ['Requêtes imprimées:', history.filter(h => h.status === 'imprimée').length],
+                ['Requêtes envoyées:', history.filter(h => h.status === 'envoyée').length],
+                ['Requêtes épinglées:', history.filter(h => h.pinned).length],
+                [''],
+                ['PÉRIODE COUVERTE'],
+                ['Plus ancienne requête:', history.reduce((min, h) => h.date < min ? h.date : min, history[0]?.date || 'N/A')],
+                ['Plus récente requête:', history.reduce((max, h) => h.date > max ? h.date : max, history[0]?.date || 'N/A')],
+                [''],
+                ['COÛT TOTAL'],
+                ['Montant total:', history.reduce((sum, h) => sum + (h.totalCost || 0), 0).toFixed(2) + ' $'],
+                ['Coût moyen par requête:', (history.reduce((sum, h) => sum + (h.totalCost || 0), 0) / history.length).toFixed(2) + ' $']
+            ];
+            
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+            
+            // Mise en forme de la feuille résumé
+            summarySheet['!cols'] = [
+                { wch: 25 }, // Colonne A
+                { wch: 20 }  // Colonne B
+            ];
+            
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Résumé');
+            
+            // === FEUILLE 2: DONNÉES DÉTAILLÉES ===
+            const detailHeaders = [
+                'Date',
+                'Client',
+                'Intervenant', 
+                'Poste',
+                'Statut',
+                'Articles',
+                'Coût Total',
+                'Résumé Articles',
+                'Épinglé',
+                'Timestamp'
+            ];
+            
+            const detailData = [detailHeaders];
+            
+            // Trier l'historique par date (plus récent en premier)
+            const sortedHistory = [...history].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+            
+            sortedHistory.forEach(entry => {
+                detailData.push([
+                    entry.date || '',
+                    entry.client || '',
+                    entry.intervenant || '',
+                    entry.formData?.poste || '',
+                    entry.status || '',
+                    entry.itemsCount || 0,
+                    entry.totalCost ? entry.totalCost.toFixed(2) + ' $' : '0.00 $',
+                    entry.summary || '',
+                    entry.pinned ? 'Oui' : 'Non',
+                    entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('fr-CA') + ' ' + new Date(entry.timestamp).toLocaleTimeString('fr-CA') : ''
+                ]);
+            });
+            
+            const detailSheet = XLSX.utils.aoa_to_sheet(detailData);
+            
+            // Mise en forme de la feuille détails
+            detailSheet['!cols'] = [
+                { wch: 12 }, // Date
+                { wch: 20 }, // Client
+                { wch: 20 }, // Intervenant
+                { wch: 15 }, // Poste
+                { wch: 10 }, // Statut
+                { wch: 8 },  // Articles
+                { wch: 12 }, // Coût
+                { wch: 40 }, // Résumé
+                { wch: 8 },  // Épinglé
+                { wch: 18 }  // Timestamp
+            ];
+            
+            // Filtres automatiques sur la ligne d'en-tête
+            detailSheet['!autofilter'] = { ref: `A1:J${detailData.length}` };
+            
+            XLSX.utils.book_append_sheet(workbook, detailSheet, 'Données détaillées');
+            
+            // === FEUILLE 3: ANALYSE PAR MOIS ===
+            const monthlyStats = {};
+            history.forEach(entry => {
+                if (entry.date) {
+                    const monthKey = entry.date.substring(0, 7); // YYYY-MM
+                    if (!monthlyStats[monthKey]) {
+                        monthlyStats[monthKey] = {
+                            count: 0,
+                            totalCost: 0,
+                            printed: 0,
+                            sent: 0
+                        };
+                    }
+                    monthlyStats[monthKey].count++;
+                    monthlyStats[monthKey].totalCost += entry.totalCost || 0;
+                    if (entry.status === 'imprimée') monthlyStats[monthKey].printed++;
+                    if (entry.status === 'envoyée') monthlyStats[monthKey].sent++;
+                }
+            });
+            
+            const monthlyData = [
+                ['ANALYSE MENSUELLE'],
+                [''],
+                ['Mois', 'Requêtes', 'Imprimées', 'Envoyées', 'Coût Total']
+            ];
+            
+            Object.keys(monthlyStats).sort().forEach(month => {
+                const stats = monthlyStats[month];
+                monthlyData.push([
+                    month,
+                    stats.count,
+                    stats.printed,
+                    stats.sent,
+                    stats.totalCost.toFixed(2) + ' $'
+                ]);
+            });
+            
+            const monthlySheet = XLSX.utils.aoa_to_sheet(monthlyData);
+            monthlySheet['!cols'] = [
+                { wch: 12 }, // Mois
+                { wch: 10 }, // Requêtes
+                { wch: 10 }, // Imprimées
+                { wch: 10 }, // Envoyées
+                { wch: 15 }  // Coût
+            ];
+            
+            XLSX.utils.book_append_sheet(workbook, monthlySheet, 'Analyse mensuelle');
+            
+            // Génération du fichier
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('fr-CA').replace(/-/g, '');
+            const timeStr = now.toLocaleTimeString('fr-CA', {hour12: false}).replace(/:/g, '');
+            const filename = `Historique_Requisitions_${dateStr}_${timeStr}.xlsx`;
+            
+            // Télécharger le fichier Excel
+            XLSX.writeFile(workbook, filename);
+            
+            showNotice('info', `Historique exporté avec succès : ${filename}`);
+        }
+
+        // Restaurer une requête de l'historique
+        function restoreFromHistory(entryId) {
+            try {
+                const history = getHistory();
+                const entry = history.find(item => item.id === entryId);
+                
+                if (!entry) {
+                    showNotice('error', 'Requête introuvable dans l\'historique.');
+                    return;
+                }
+                
+                console.log('Données de l\'entrée à restaurer:', entry);
+                
+                // Vérifier si l'entrée a les nouvelles données détaillées
+                if (!entry.standardItems && !entry.customItems) {
+                    showNotice('warn', 'Cette requête a été sauvegardée avant la mise à jour de la restauration. Seules les informations de base peuvent être restaurées.');
+                    
+                    // Restauration basique pour les anciennes entrées
+                    const confirmation = confirm(`Restaurer les informations de base pour "${entry.client}" du ${entry.date}?\n\n(Client et informations générales seulement)`);
+                    if (!confirmation) return;
+                    
+                    document.getElementById('client').value = entry.client || '';
+                    showNotice('info', 'Informations de base restaurées. Les articles ne peuvent pas être restaurés pour cette ancienne requête.');
+                    closeHistory();
+                    return;
+                }
+                
+                // Demander confirmation pour restauration complète
+                const confirmation = confirm(`Restaurer la requête pour "${entry.client}" du ${entry.date}?\n\nCela va effacer la sélection actuelle et la remplacer par celle de l'historique.`);
+                if (!confirmation) return;
+                
+                // Demander si l'utilisateur veut reporter la requête à la date d'aujourd'hui
+                const todayDate = new Date().toLocaleDateString('fr-CA');
+                let useToday = false;
+                if (entry.formData?.date && entry.formData.date !== todayDate) {
+                    useToday = confirm(`Voulez-vous reporter cette requête à la date d'aujourd'hui (${todayDate})?\n\nDate originale: ${entry.formData.date}\nDate d'aujourd'hui: ${todayDate}\n\nCliquez "OK" pour utiliser la date d'aujourd'hui, "Annuler" pour garder la date originale.`);
+                }
+                
+                console.log('Restauration complète de la requête:', entry);
+                
+                // 1. Effacer toute sélection actuelle
+                clearAll();
+                
+                // 2. Restaurer les données du formulaire
+                if (entry.formData) {
+                    document.getElementById('client').value = entry.formData.client || '';
+                    document.getElementById('nomIntervenant').value = entry.formData.intervenant || '';
+                    document.getElementById('poste').value = entry.formData.poste || '';
+                    document.getElementById('commentaires').value = entry.formData.commentaires || '';
+                    if (entry.formData.date) {
+                        document.getElementById('date').value = useToday ? todayDate : entry.formData.date;
+                    }
+                }
+                
+                // 3. Restaurer les articles standards
+                if (entry.standardItems && entry.standardItems.length > 0) {
+                    console.log('Restauration des articles standards:', entry.standardItems);
+                    
+                    entry.standardItems.forEach((item, index) => {
+                        console.log(`Restauration article ${index + 1}:`, item);
+                        
+                        const checkbox = document.getElementById(item.id);
+                        if (checkbox) {
+                            console.log(`Checkbox trouvé pour ${item.id}`);
+                            
+                            // Activer l'article
+                            checkbox.checked = true;
+                            toggleItem(checkbox);
+                            
+                            // Attendre un peu pour que l'activation se termine
+                            setTimeout(() => {
+                                // Restaurer la quantité
+                                const qtyInput = checkbox.closest('.item').querySelector('.item-qty');
+                                if (qtyInput) {
+                                    console.log(`Définition quantité ${item.qty} pour ${item.id}`);
+                                    qtyInput.value = item.qty;
+                                    updateItemPrice(item.id);
+                                }
+                                
+                                // Restaurer le mode unité si applicable
+                                if (item.isUnitMode) {
+                                    const unitToggle = document.getElementById(`unit-toggle-${item.id}`);
+                                    if (unitToggle && !unitToggle.checked) {
+                                        console.log(`Activation mode unité pour ${item.id}`);
+                                        unitToggle.checked = true;
+                                        unitToggle.dispatchEvent(new Event('change'));
+                                    }
+                                }
+                                
+                                // Restaurer les inputs spéciaux
+                                if (item.specialInputs && Object.keys(item.specialInputs).length > 0) {
+                                    console.log(`Restauration inputs spéciaux pour ${item.id}:`, item.specialInputs);
+                                    Object.keys(item.specialInputs).forEach(inputId => {
+                                        const input = document.getElementById(inputId);
+                                        if (input) {
+                                            input.value = item.specialInputs[inputId];
+                                            console.log(`Input ${inputId} = ${item.specialInputs[inputId]}`);
+                                        } else {
+                                            console.warn(`Input ${inputId} non trouvé`);
+                                        }
+                                    });
+                                }
+                                
+                                // Restaurer les couleurs Tubifast
+                                if (item.tubifastColors && item.tubifastColors.length > 0) {
+                                    console.log(`Restauration couleurs Tubifast pour ${item.id}:`, item.tubifastColors);
+                                    item.tubifastColors.forEach(color => {
+                                        const colorCheckbox = document.getElementById(`tubifast-${color}-${item.id}`);
+                                        if (colorCheckbox) {
+                                            colorCheckbox.checked = true;
+                                            console.log(`Couleur ${color} activée pour ${item.id}`);
+                                        }
+                                    });
+                                }
+                            }, 50); // Délai pour laisser le temps à l'activation
+                            
+                        } else {
+                            console.warn(`Checkbox non trouvé pour l'ID: ${item.id}`);
+                        }
+                    });
+                } else {
+                    console.log('Aucun article standard à restaurer');
+                }
+                
+                // 4. Restaurer les articles hors liste
+                if (entry.customItems && entry.customItems.length > 0) {
+                    console.log('Restauration des articles hors liste:', entry.customItems);
+                    
+                    // Attendre un peu pour la restauration des articles hors liste
+                    setTimeout(() => {
+                        entry.customItems.forEach((customItem, index) => {
+                            console.log(`Restauration article hors liste ${index + 1}:`, customItem);
+                            
+                            // Trouver ou créer la ligne correspondante
+                            const list = document.getElementById('customItemsList');
+                            if (!list) {
+                                console.error('Liste des articles hors liste non trouvée');
+                                return;
+                            }
+                            
+                            let existingRows = list.querySelectorAll('.item');
+                            
+                            // Créer des lignes supplémentaires si nécessaire
+                            while (existingRows.length <= index) {
+                                // Utiliser la méthode existante ou créer manuellement
+                                try {
+                                    if (typeof createCustomItemRow === 'function') {
+                                        list.appendChild(createCustomItemRow());
+                                    } else {
+                                        // Créer manuellement la ligne
+                                        const newRow = document.createElement('div');
+                                        newRow.className = 'item';
+                                        newRow.innerHTML = `
+                                            <input type="checkbox" id="custom-check-${customItemCounter}" onchange="toggleCustomItem(this, ${customItemCounter})">
+                                            <div class="item-details">
+                                                <input type="text" class="custom-desc-input" id="custom-desc-${customItemCounter}" 
+                                                       placeholder="Description de l'article..." 
+                                                       oninput="onCustomDescInput(${customItemCounter})">
+                                            </div>
+                                            <span class="item-max">Max 20</span>
+                                            <div class="qty-controls" style="display: none;">
+                                                <button class="qty-btn decrement" onclick="adjustCustomQty(${customItemCounter}, -1)" disabled>-1</button>
+                                                <input type="number" class="item-qty" id="custom-qty-${customItemCounter}" min="1" max="20" value="1" disabled>
+                                                <button class="qty-btn increment" onclick="adjustCustomQty(${customItemCounter}, 1)" disabled>+1</button>
+                                            </div>
+                                            <span class="item-price">-</span>
+                                        `;
+                                        list.appendChild(newRow);
+                                        customItemCounter++;
+                                    }
+                                } catch (e) {
+                                    console.error('Erreur lors de la création de ligne personnalisée:', e);
+                                    return;
+                                }
+                                existingRows = list.querySelectorAll('.item');
+                            }
+                            
+                            const row = existingRows[index];
+                            if (row) {
+                                const descInput = row.querySelector('.custom-desc-input');
+                                const checkbox = row.querySelector('input[type="checkbox"]');
+                                const qtyInput = row.querySelector('.item-qty');
+                                
+                                if (descInput && checkbox && qtyInput) {
+                                    // Remplir la description
+                                    descInput.value = customItem.name;
+                                    console.log(`Description définie: ${customItem.name}`);
+                                    
+                                    // Activer la checkbox
+                                    checkbox.checked = true;
+                                    
+                                    // Déclencher l'événement pour activer l'item
+                                    const event = new Event('change');
+                                    checkbox.dispatchEvent(event);
+                                    
+                                    // Définir la quantité
+                                    setTimeout(() => {
+                                        qtyInput.value = customItem.qty;
+                                        console.log(`Quantité définie: ${customItem.qty}`);
+                                    }, 10);
+                                }
+                            }
+                        });
+                        
+                        // Mettre à jour le résumé après un délai
+                        setTimeout(() => {
+                            updateSummary();
+                        }, 100);
+                        
+                    }, 100); // Délai pour laisser le temps aux articles standards de se charger
+                } else {
+                    console.log('Aucun article hors liste à restaurer');
+                }
+                
+                // 5. Mettre à jour le résumé après tous les délais
+                setTimeout(() => {
+                    updateSummary();
+                    console.log('Résumé mis à jour');
+                }, 200);
+                
+                // 6. Fermer la modal d'historique
+                closeHistory();
+                
+                // 7. Pas de notification (restauration silencieuse)
+                // showNotice('success', `Requête restaurée avec succès: ${entry.itemsCount} article${entry.itemsCount > 1 ? 's' : ''} pour ${entry.client}.`);
+                
+                // 8. Scroll vers le haut pour voir les changements
+                setTimeout(() => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }, 100);
+                
+            } catch (e) {
+                console.error('Erreur lors de la restauration:', e);
+                showNotice('error', 'Erreur lors de la restauration de la requête.');
+            }
+        }
+
+        // Fermer la modal en cliquant à l'extérieur
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('history-modal');
+            if (e.target === modal) {
+                closeHistory();
+            }
+        });
+
+        // Initialiser la navigation au clavier après la génération des catégories
+        document.addEventListener('DOMContentLoaded', function() {
+            generateAllCategories();
+            initKeyboardNavigation();
+            initSearch();
+            initCustomItems();
+            
+            // Initialiser les gestionnaires d'événements pour le champ commentaires
+            const commentairesField = document.getElementById('commentaires');
+            if (commentairesField) {
+                commentairesField.addEventListener('focus', function() {
+                    isInCommentsField = true;
+                });
+                commentairesField.addEventListener('blur', function() {
+                    isInCommentsField = false;
+                });
+                
+                // Désactiver aussi la propagation des événements clavier dans le champ commentaires
+                commentairesField.addEventListener('keydown', function(e) {
+                    e.stopPropagation();
+                });
+                commentairesField.addEventListener('keyup', function(e) {
+                    e.stopPropagation();
+                });
+                commentairesField.addEventListener('keypress', function(e) {
+                    e.stopPropagation();
+                });
+            }
+            
+            // Retirer l'état d'erreur quand les champs requis sont renseignés
+            ['nomIntervenant','client'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    const valOk = (el.value || '').trim().length > 0;
+                    el.classList.toggle('input-error', !valOk);
+                    const otherId = id === 'nomIntervenant' ? 'client' : 'nomIntervenant';
+                    const otherOk = (document.getElementById(otherId).value || '').trim().length > 0;
+                    if (valOk && otherOk) hideFormError();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
