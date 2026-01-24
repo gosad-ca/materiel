@@ -99,6 +99,48 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
         }
+
+        /* Dropdown autocomplete pour les noms de clients */
+        .autocomplete-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .autocomplete-wrapper input {
+            width: 100%;
+        }
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 180px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ced4da;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+        }
+        .autocomplete-dropdown.visible {
+            display: block;
+        }
+        .autocomplete-option {
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.15s;
+        }
+        .autocomplete-option:last-child {
+            border-bottom: none;
+        }
+        .autocomplete-option:hover,
+        .autocomplete-option.active {
+            background: #f0f4ff;
+            color: #435ebe;
+        }
         /* Indication d'erreur pour les champs requis */
         .form-group input.input-error {
             border-color: #dc3545;
@@ -1015,7 +1057,10 @@
                 </div>
                 <div class="form-group">
                     <label for="client">Client:</label>
-                    <input type="text" id="client" name="client">
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="client" name="client" autocomplete="off">
+                        <div class="autocomplete-dropdown" id="clientDropdown"></div>
+                    </div>
                 </div>
             </div>
              <div class="form-row">
@@ -1070,9 +1115,7 @@
 
         <div class="controls">
             <button class="btn btn-secondary" onclick="clearAll()">Effacer tout</button>
-            <button class="btn btn-success" onclick="prepareAndPrint()">Imprimer</button>
-            <button class="btn btn-primary" onclick="sendRequisitionEmail()">Envoyer par courriel (cellulaire) </button>
-            <button class="btn btn-info" onclick="openOutlookWeb()" title="Ouvrir Outlook Web avec l'adresse pré-remplie">📧 Envoyer à l'agente AA - Outlook Web (Bureau/inf. aux) </button>
+            <button class="btn btn-primary" onclick="sendRequisitionEmail()">Envoyer par courriel</button>
             <button class="btn btn-info" onclick="toggleKeyboardHelp()" title="Afficher l'aide clavier">⌨️ Aide</button>
         </div>
 
@@ -1104,7 +1147,6 @@
                     <div id="history-list" class="history-list"></div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-info" onclick="exportHistoryExcel()" title="Exporter l'historique complet en Excel">📊 Exporter Excel</button>
                     <button class="btn btn-secondary" onclick="clearAllHistory()">Effacer tout l'historique</button>
                     <button class="btn btn-primary" onclick="closeHistory()">Fermer</button>
                 </div>
@@ -1485,7 +1527,7 @@
                 cb.checked = false;
                 toggleItem(cb);
             });
-            ['nomIntervenant', 'poste', 'client', 'commentaires'].forEach(id => document.getElementById(id).value = '');
+            ['client', 'commentaires'].forEach(id => document.getElementById(id).value = '');
             
             // Réinitialiser la recherche
             clearSearch();
@@ -2967,12 +3009,137 @@ ${intervenant}`;
         // SYSTÈME DE PERSISTANCE LOCALE
         // ================================
         const STORAGE_KEYS = {
-            HISTORY: 'requisition_history'
+            HISTORY: 'requisition_history',
+            INTERVENANT: 'requisition_intervenant',
+            POSTE: 'requisition_poste'
         };
 
         const MAX_HISTORY_NORMAL = 400;
         const MAX_HISTORY_TOTAL = 500;
 
+        // ================================
+        // PERSISTANCE INTERVENANT / POSTE
+        // ================================
+        function saveIntervenantPoste() {
+            const intervenant = document.getElementById('nomIntervenant').value.trim();
+            const poste = document.getElementById('poste').value.trim();
+            if (intervenant) localStorage.setItem(STORAGE_KEYS.INTERVENANT, intervenant);
+            if (poste) localStorage.setItem(STORAGE_KEYS.POSTE, poste);
+        }
+
+        function restoreIntervenantPoste() {
+            const intervenant = localStorage.getItem(STORAGE_KEYS.INTERVENANT);
+            const poste = localStorage.getItem(STORAGE_KEYS.POSTE);
+            if (intervenant) document.getElementById('nomIntervenant').value = intervenant;
+            if (poste) document.getElementById('poste').value = poste;
+        }
+
+        // ================================
+        // AUTOCOMPLETE CLIENTS
+        // ================================
+        function getKnownClients() {
+            try {
+                const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY) || '[]');
+                const names = history
+                    .map(entry => (entry.client || '').trim())
+                    .filter(name => name && name !== 'Client non spécifié');
+                // Dédupliquer et trier alphabétiquement
+                return [...new Set(names)].sort((a, b) => a.localeCompare(b, 'fr'));
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function initClientAutocomplete() {
+            const input = document.getElementById('client');
+            const dropdown = document.getElementById('clientDropdown');
+            if (!input || !dropdown) return;
+
+            let activeIndex = -1;
+
+            function renderDropdown(filter) {
+                const clients = getKnownClients();
+                const filtered = filter
+                    ? clients.filter(c => c.toLowerCase().includes(filter.toLowerCase()))
+                    : clients;
+
+                if (filtered.length === 0) {
+                    dropdown.classList.remove('visible');
+                    return;
+                }
+
+                dropdown.innerHTML = filtered.map((name, i) =>
+                    `<div class="autocomplete-option" data-index="${i}">${name}</div>`
+                ).join('');
+                dropdown.classList.add('visible');
+                activeIndex = -1;
+
+                // Gestion du clic sur une option
+                dropdown.querySelectorAll('.autocomplete-option').forEach(opt => {
+                    opt.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                        input.value = this.textContent;
+                        dropdown.classList.remove('visible');
+                        input.classList.remove('input-error');
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                });
+            }
+
+            // Afficher le dropdown au focus si des clients existent
+            input.addEventListener('focus', function() {
+                renderDropdown(this.value);
+            });
+
+            // Filtrer en tapant
+            input.addEventListener('input', function() {
+                renderDropdown(this.value);
+            });
+
+            // Navigation clavier dans le dropdown
+            input.addEventListener('keydown', function(e) {
+                const options = dropdown.querySelectorAll('.autocomplete-option');
+                if (!dropdown.classList.contains('visible') || options.length === 0) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIndex = Math.min(activeIndex + 1, options.length - 1);
+                    updateActiveOption(options);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIndex = Math.max(activeIndex - 1, -1);
+                    updateActiveOption(options);
+                } else if (e.key === 'Enter' && activeIndex >= 0) {
+                    e.preventDefault();
+                    input.value = options[activeIndex].textContent;
+                    dropdown.classList.remove('visible');
+                    input.classList.remove('input-error');
+                } else if (e.key === 'Escape') {
+                    dropdown.classList.remove('visible');
+                }
+            });
+
+            function updateActiveOption(options) {
+                options.forEach((opt, i) => {
+                    opt.classList.toggle('active', i === activeIndex);
+                    if (i === activeIndex) opt.scrollIntoView({ block: 'nearest' });
+                });
+            }
+
+            // Fermer le dropdown quand on clique ailleurs
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.autocomplete-wrapper')) {
+                    dropdown.classList.remove('visible');
+                }
+            });
+
+            // Empêcher la propagation du keydown dans le dropdown (conflit navigation clavier)
+            input.addEventListener('keydown', function(e) {
+                if (['ArrowDown', 'ArrowUp'].includes(e.key) && dropdown.classList.contains('visible')) {
+                    e.stopPropagation();
+                }
+            });
+        }
 
         // Fonction pour récupérer les articles sélectionnés (non-custom)
         function getSelectedItems() {
@@ -3323,216 +3490,13 @@ ${intervenant}`;
             `).join('');
         }
 
-        // Hash du mot de passe (obfusqué)
-        const ADMIN_HASH = 'ca45ed1c0f46c74a71cad13f9cfeeec5848e211eb3475816f042b9e95724750a';
-
-        // Fonction de vérification du mot de passe
-        async function verifyAdminPassword(input) {
-            if (!input) return false;
-            
-            const encoder = new TextEncoder();
-            const data = encoder.encode(input);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            
-            return hashHex === ADMIN_HASH;
-        }
-
-        // Effacer tout l'historique (protégé par mot de passe)
-        async function clearAllHistory() {
-            // Demander le mot de passe administrateur
-            const password = prompt('Mot de passe administrateur requis pour effacer l\'historique:');
-            if (!password) {
-                return; // Utilisateur a annulé
-            }
-            
-            // Vérifier le mot de passe
-            const isValid = await verifyAdminPassword(password);
-            if (!isValid) {
-                showNotice('error', 'Mot de passe incorrect. Accès refusé.');
-                return;
-            }
-            
-            // Si le mot de passe est correct, demander confirmation
+        // Effacer tout l'historique
+        function clearAllHistory() {
             if (confirm('Êtes-vous sûr de vouloir effacer tout l\'historique ? Cette action est irréversible.')) {
                 localStorage.removeItem(STORAGE_KEYS.HISTORY);
                 renderHistory();
                 showNotice('info', 'Historique effacé avec succès.');
             }
-        }
-
-        // Exporter l'historique en Excel (protégé par mot de passe)
-        async function exportHistoryExcel() {
-            // Demander le mot de passe administrateur
-            const password = prompt('Mot de passe administrateur requis pour exporter l\'historique:');
-            if (!password) {
-                return; // Utilisateur a annulé
-            }
-            
-            // Vérifier le mot de passe
-            const isValid = await verifyAdminPassword(password);
-            if (!isValid) {
-                showNotice('error', 'Mot de passe incorrect. Accès refusé.');
-                return;
-            }
-            
-            // Récupérer l'historique
-            const history = getHistory();
-            if (history.length === 0) {
-                showNotice('info', 'Aucune requête dans l\'historique à exporter.');
-                return;
-            }
-            
-            // Créer un nouveau classeur Excel
-            const workbook = XLSX.utils.book_new();
-            
-            // === FEUILLE 1: RÉSUMÉ EXÉCUTIF ===
-            const summaryData = [
-                ['RAPPORT D\'HISTORIQUE DES RÉQUISITIONS'],
-                ['SAD - Services Administratifs'],
-                [''],
-                ['Date du rapport:', new Date().toLocaleDateString('fr-CA')],
-                ['Heure du rapport:', new Date().toLocaleTimeString('fr-CA')],
-                [''],
-                ['STATISTIQUES GÉNÉRALES'],
-                ['Nombre total de requêtes:', history.length],
-                ['Requêtes imprimées:', history.filter(h => h.status === 'imprimée').length],
-                ['Requêtes envoyées:', history.filter(h => h.status === 'envoyée').length],
-                ['Requêtes épinglées:', history.filter(h => h.pinned).length],
-                [''],
-                ['PÉRIODE COUVERTE'],
-                ['Plus ancienne requête:', history.reduce((min, h) => h.date < min ? h.date : min, history[0]?.date || 'N/A')],
-                ['Plus récente requête:', history.reduce((max, h) => h.date > max ? h.date : max, history[0]?.date || 'N/A')],
-                [''],
-                ['COÛT TOTAL'],
-                ['Montant total:', history.reduce((sum, h) => sum + (h.totalCost || 0), 0).toFixed(2) + ' $'],
-                ['Coût moyen par requête:', (history.reduce((sum, h) => sum + (h.totalCost || 0), 0) / history.length).toFixed(2) + ' $']
-            ];
-            
-            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-            
-            // Mise en forme de la feuille résumé
-            summarySheet['!cols'] = [
-                { wch: 25 }, // Colonne A
-                { wch: 20 }  // Colonne B
-            ];
-            
-            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Résumé');
-            
-            // === FEUILLE 2: DONNÉES DÉTAILLÉES ===
-            const detailHeaders = [
-                'Date',
-                'Client',
-                'Intervenant', 
-                'Poste',
-                'Statut',
-                'Articles',
-                'Coût Total',
-                'Résumé Articles',
-                'Épinglé',
-                'Timestamp'
-            ];
-            
-            const detailData = [detailHeaders];
-            
-            // Trier l'historique par date (plus récent en premier)
-            const sortedHistory = [...history].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-            
-            sortedHistory.forEach(entry => {
-                detailData.push([
-                    entry.date || '',
-                    entry.client || '',
-                    entry.intervenant || '',
-                    entry.formData?.poste || '',
-                    entry.status || '',
-                    entry.itemsCount || 0,
-                    entry.totalCost ? entry.totalCost.toFixed(2) + ' $' : '0.00 $',
-                    entry.summary || '',
-                    entry.pinned ? 'Oui' : 'Non',
-                    entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('fr-CA') + ' ' + new Date(entry.timestamp).toLocaleTimeString('fr-CA') : ''
-                ]);
-            });
-            
-            const detailSheet = XLSX.utils.aoa_to_sheet(detailData);
-            
-            // Mise en forme de la feuille détails
-            detailSheet['!cols'] = [
-                { wch: 12 }, // Date
-                { wch: 20 }, // Client
-                { wch: 20 }, // Intervenant
-                { wch: 15 }, // Poste
-                { wch: 10 }, // Statut
-                { wch: 8 },  // Articles
-                { wch: 12 }, // Coût
-                { wch: 40 }, // Résumé
-                { wch: 8 },  // Épinglé
-                { wch: 18 }  // Timestamp
-            ];
-            
-            // Filtres automatiques sur la ligne d'en-tête
-            detailSheet['!autofilter'] = { ref: `A1:J${detailData.length}` };
-            
-            XLSX.utils.book_append_sheet(workbook, detailSheet, 'Données détaillées');
-            
-            // === FEUILLE 3: ANALYSE PAR MOIS ===
-            const monthlyStats = {};
-            history.forEach(entry => {
-                if (entry.date) {
-                    const monthKey = entry.date.substring(0, 7); // YYYY-MM
-                    if (!monthlyStats[monthKey]) {
-                        monthlyStats[monthKey] = {
-                            count: 0,
-                            totalCost: 0,
-                            printed: 0,
-                            sent: 0
-                        };
-                    }
-                    monthlyStats[monthKey].count++;
-                    monthlyStats[monthKey].totalCost += entry.totalCost || 0;
-                    if (entry.status === 'imprimée') monthlyStats[monthKey].printed++;
-                    if (entry.status === 'envoyée') monthlyStats[monthKey].sent++;
-                }
-            });
-            
-            const monthlyData = [
-                ['ANALYSE MENSUELLE'],
-                [''],
-                ['Mois', 'Requêtes', 'Imprimées', 'Envoyées', 'Coût Total']
-            ];
-            
-            Object.keys(monthlyStats).sort().forEach(month => {
-                const stats = monthlyStats[month];
-                monthlyData.push([
-                    month,
-                    stats.count,
-                    stats.printed,
-                    stats.sent,
-                    stats.totalCost.toFixed(2) + ' $'
-                ]);
-            });
-            
-            const monthlySheet = XLSX.utils.aoa_to_sheet(monthlyData);
-            monthlySheet['!cols'] = [
-                { wch: 12 }, // Mois
-                { wch: 10 }, // Requêtes
-                { wch: 10 }, // Imprimées
-                { wch: 10 }, // Envoyées
-                { wch: 15 }  // Coût
-            ];
-            
-            XLSX.utils.book_append_sheet(workbook, monthlySheet, 'Analyse mensuelle');
-            
-            // Génération du fichier
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('fr-CA').replace(/-/g, '');
-            const timeStr = now.toLocaleTimeString('fr-CA', {hour12: false}).replace(/:/g, '');
-            const filename = `Historique_Requisitions_${dateStr}_${timeStr}.xlsx`;
-            
-            // Télécharger le fichier Excel
-            XLSX.writeFile(workbook, filename);
-            
-            showNotice('info', `Historique exporté avec succès : ${filename}`);
         }
 
         // Restaurer une requête de l'historique
@@ -3786,7 +3750,17 @@ ${intervenant}`;
             initKeyboardNavigation();
             initSearch();
             initCustomItems();
-            
+
+            // Restaurer intervenant/poste depuis le localStorage
+            restoreIntervenantPoste();
+
+            // Sauvegarder intervenant/poste quand modifiés
+            document.getElementById('nomIntervenant').addEventListener('change', saveIntervenantPoste);
+            document.getElementById('poste').addEventListener('change', saveIntervenantPoste);
+
+            // Initialiser l'autocomplete des noms de clients
+            initClientAutocomplete();
+
             // Initialiser les gestionnaires d'événements pour le champ commentaires
             const commentairesField = document.getElementById('commentaires');
             if (commentairesField) {
